@@ -1,0 +1,8 @@
+{"instruction": "Summarize the following sentence in one short sentence.", "input": "Open-source language models can be fine-tuned with parameter-efficient methods like LoRA and QLoRA on consumer GPUs when memory is managed carefully.", "output": "Open LLMs can be fine-tuned with LoRA/QLoRA on consumer GPUs."}
+{"instruction": "Rewrite this sentence in active voice.", "input": "The book was read by the student.", "output": "The student read the book."}
+{"instruction": "Translate to French.", "input": "I have one notebook.", "output": "J'ai un cahier."}
+{"instruction": "Continue the sentence.", "input": "Memory-efficient fine-tuning matters because", "output": "consumer GPUs have limited VRAM and large models cannot fit otherwise."}
+{"instruction": "Answer the question.", "input": "What does the acronym LoRA stand for?", "output": "Low-Rank Adaptation."}
+{"instruction": "Summarize the paragraph in one sentence.", "input": "QLoRA quantizes the base model to 4-bit NF4, keeps the LoRA adapter in higher precision, and uses paged 8-bit AdamW to keep optimizer states small. This combination makes fine-tuning of 7-13B models feasible on a single 16-24 GB GPU.", "output": "QLoRA fine-tunes large LLMs on consumer GPUs by combining 4-bit base weights, higher-precision LoRA adapters, and 8-bit paged optimizers."}
+{"instruction": "Give an example of an open-weight 1.5B language model.", "input": "", "output": "Qwen/Qwen2.5-1.5B-Instruct is an open-weight 1.5B parameter instruction-tuned language model released by Alibaba."}
+{"instruction": "Why is gradient checkpointing useful during fine-tuning?", "input": "", "output": "It trades extra computation for reduced activation memory, allowing larger models or longer sequences to fit on the same GPU."}

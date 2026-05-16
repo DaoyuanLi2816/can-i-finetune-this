@@ -1,0 +1,51 @@
+# Expected VRAM for this recipe
+
+Computed by `canifinetune` at recipe-generation time using the static estimator.
+Numbers are **predictions**, not measurements. Real VRAM may differ; run
+`canifinetune bench` to calibrate on your card.
+
+## Inputs
+
+| Field | Value |
+| --- | --- |
+| model | `{{ model_id }}` ({{ model_family }}, ~{{ "%.2f"|format(model_total_params / 1e9) }} B params, source: {{ model_source }}) |
+| method | {{ method }} |
+| base dtype | {{ base_dtype }} |
+| quantization | {{ quantization }} |
+| seq_len | {{ seq_len }} |
+| micro_batch_size | {{ micro_batch_size }} |
+| LoRA rank | {{ lora_rank }} |
+| target modules | {{ target_modules | join(", ") }} |
+| optimizer | {{ optimizer }} |
+| gradient_checkpointing | {{ gradient_checkpointing }} |
+| attention impl | {{ attention_implementation }} |
+| target GPU | {{ gpu_vram_gb }} GB |
+
+## Breakdown
+
+| Component | GB |
+| --- | --- |
+| static weights | {{ "%.3f"|format(estimate_memory.static_model_gb) }} |
+| quantization overhead | {{ "%.3f"|format(estimate_memory.quantization_overhead_gb) }} |
+| trainable parameters | {{ "%.1f"|format(estimate_memory.trainable_params_mb) }} MB |
+| gradients | {{ "%.3f"|format(estimate_memory.gradients_gb) }} |
+| optimizer states | {{ "%.3f"|format(estimate_memory.optimizer_gb) }} |
+| activations | {{ "%.3f"|format(estimate_memory.activations_gb) }} |
+| CUDA / fragmentation overhead | {{ "%.3f"|format(estimate_memory.cuda_overhead_gb) }} |
+| safety margin | {{ "%.3f"|format(estimate_memory.safety_margin_gb) }} |
+| **total estimated** | **{{ "%.3f"|format(estimate_memory.total_estimated_gb) }}** |
+
+Feasibility on a {{ gpu_vram_gb }} GB GPU: **{{ estimate_feasible }}**
+(confidence: {{ estimate_confidence }}).
+
+## How to verify on your machine
+
+```bash
+canifinetune bench \
+  --model "{{ model_id }}" \
+  --method {{ method }} \
+  --seq-len {{ seq_len }} \
+  --micro-batch-size {{ micro_batch_size }} \
+  --lora-rank {{ lora_rank }} \
+  --steps 3
+```

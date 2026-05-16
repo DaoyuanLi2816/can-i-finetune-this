@@ -1,0 +1,127 @@
+[build-system]
+requires = ["hatchling>=1.24"]
+build-backend = "hatchling.build"
+
+[project]
+name = "canifinetune"
+version = "0.1.0"
+description = "Estimate, benchmark, and generate fine-tuning recipes for LLMs on consumer GPUs."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+  { name = "Daoyuan Li", email = "lidaoyuan2816@gmail.com" },
+]
+keywords = [
+  "llm",
+  "fine-tuning",
+  "lora",
+  "qlora",
+  "gpu",
+  "memory",
+  "huggingface",
+  "transformers",
+  "peft",
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+dependencies = [
+  "typer>=0.12",
+  "rich>=13.7",
+  "pydantic>=2.6",
+  "pyyaml>=6.0",
+  "huggingface-hub>=0.25",
+  "jinja2>=3.1",
+  "platformdirs>=4.2",
+]
+
+[project.optional-dependencies]
+train = [
+  "torch>=2.3",
+  "transformers>=4.43",
+  "accelerate>=0.33",
+  "peft>=0.12",
+  "datasets>=2.20",
+  "trl>=0.9",
+  "bitsandbytes>=0.43;platform_system!='Darwin'",
+  "sentencepiece>=0.2",
+  "protobuf>=4.25",
+]
+report = [
+  "pandas>=2.2",
+  "tabulate>=0.9",
+]
+dev = [
+  "pytest>=8.0",
+  "pytest-cov>=5.0",
+  "ruff>=0.5",
+  "mypy>=1.10",
+  "types-PyYAML>=6.0",
+]
+
+[project.scripts]
+canifinetune = "canifinetune.cli:app"
+
+[project.urls]
+Homepage = "https://github.com/DaoyuanLi2816/can-i-finetune-this"
+Issues = "https://github.com/DaoyuanLi2816/can-i-finetune-this/issues"
+Repository = "https://github.com/DaoyuanLi2816/can-i-finetune-this"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/canifinetune"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+  "src/canifinetune",
+  "README.md",
+  "LICENSE",
+  "pyproject.toml",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+extend-exclude = [
+  "src/canifinetune/recipes/templates",
+  "examples",
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "B", "UP", "C4", "SIM"]
+ignore = [
+  "E501",  # line length handled by formatter where reasonable
+  "B008",  # typer/Argument(...) defaults are intentional
+  "B904",  # raise from in CLI is noisy
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["B018"]
+
+[tool.pytest.ini_options]
+addopts = "-ra --strict-markers --strict-config"
+testpaths = ["tests"]
+markers = [
+  "gpu: tests that require a CUDA GPU (skipped in CI)",
+  "slow: tests that take more than a few seconds",
+  "network: tests that require network access",
+]
+
+[tool.mypy]
+python_version = "3.10"
+strict = false
+ignore_missing_imports = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+warn_unused_configs = true
+no_implicit_optional = true

@@ -1,0 +1,62 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+*.egg
+
+# Virtual envs
+.venv/
+venv/
+env/
+.python-version-local
+
+# Tooling
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Project local artifacts (small results are tracked under benchmarks/results)
+.cache/
+hf_cache/
+runs/
+output*/
+checkpoints/
+adapters/
+*.log
+
+# Models we never want to commit
+*.bin
+*.safetensors
+*.gguf
+*.pt
+*.pth
+*.onnx
+
+# Large datasets
+*.parquet
+*.arrow
+
+# OneDrive cruft
+*.tmp
+*.lock
