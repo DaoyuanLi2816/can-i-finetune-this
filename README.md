@@ -1,5 +1,9 @@
 # can-i-finetune-this
 
+[![CI](https://github.com/DaoyuanLi2816/can-i-finetune-this/actions/workflows/ci.yml/badge.svg)](https://github.com/DaoyuanLi2816/can-i-finetune-this/actions/workflows/ci.yml)
+[![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org)
+[![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+
 **Estimate, benchmark, and generate fine-tuning recipes for LLMs on consumer GPUs.**
 
 ![can-i-finetune-this architecture](docs/architecture.png)
