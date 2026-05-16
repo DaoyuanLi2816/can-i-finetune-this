@@ -1,0 +1,10 @@
+torch>=2.3
+transformers>=4.43
+accelerate>=0.33
+peft>=0.12
+datasets>=2.20
+trl>=0.9
+sentencepiece>=0.2
+protobuf>=4.25
+pyyaml>=6.0
+

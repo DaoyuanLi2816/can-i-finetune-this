@@ -1,0 +1,131 @@
+{
+  "config": {
+    "model_id": "sshleifer/tiny-gpt2",
+    "method": "lora",
+    "seq_len": 128,
+    "micro_batch_size": 1,
+    "steps": 3,
+    "lora_rank": 8,
+    "lora_alpha": 16,
+    "lora_dropout": 0.0,
+    "lora_target_scope": "attention",
+    "optimizer": "adamw_torch",
+    "quantization": "bf16",
+    "base_dtype": "fp32",
+    "gradient_checkpointing": false,
+    "attention_implementation": "eager",
+    "device": "cuda",
+    "forward_only": false,
+    "record_estimate": true
+  },
+  "model_family": "gpt2",
+  "timestamp": "2026-05-16T06:49:25Z",
+  "env": {
+    "torch_version": "2.6.0+cu124",
+    "cuda_version": "12.4",
+    "cudnn_version": 90100,
+    "bf16_supported": true
+  },
+  "gpu": {
+    "index": 0,
+    "name": "NVIDIA GeForce RTX 4080",
+    "total_vram_gb": 15.992,
+    "free_vram_gb": 14.721,
+    "driver_version": "12.4",
+    "compute_capability": "8.9",
+    "available": true
+  },
+  "snapshots": [
+    {
+      "stage": "before_load",
+      "allocated_gb": 0.0,
+      "reserved_gb": 0.0,
+      "max_allocated_gb": 0.0,
+      "max_reserved_gb": 0.0,
+      "free_gb": 14.7207,
+      "total_gb": 15.9917
+    },
+    {
+      "stage": "after_load",
+      "allocated_gb": 0.0004,
+      "reserved_gb": 0.002,
+      "max_allocated_gb": 0.0004,
+      "max_reserved_gb": 0.002,
+      "free_gb": 14.7188,
+      "total_gb": 15.9917
+    },
+    {
+      "stage": "after_lora_attach",
+      "allocated_gb": 0.0004,
+      "reserved_gb": 0.002,
+      "max_allocated_gb": 0.0004,
+      "max_reserved_gb": 0.002,
+      "free_gb": 14.7188,
+      "total_gb": 15.9917
+    },
+    {
+      "stage": "after_optimizer_init",
+      "allocated_gb": 0.0004,
+      "reserved_gb": 0.002,
+      "max_allocated_gb": 0.0004,
+      "max_reserved_gb": 0.002,
+      "free_gb": 14.7188,
+      "total_gb": 15.9917
+    },
+    {
+      "stage": "after_first_forward",
+      "allocated_gb": 0.0569,
+      "reserved_gb": 0.0742,
+      "max_allocated_gb": 0.0569,
+      "max_reserved_gb": 0.0742,
+      "free_gb": 14.5996,
+      "total_gb": 15.9917
+    },
+    {
+      "stage": "after_first_backward",
+      "allocated_gb": 0.0402,
+      "reserved_gb": 0.125,
+      "max_allocated_gb": 0.1048,
+      "max_reserved_gb": 0.125,
+      "free_gb": 14.541,
+      "total_gb": 15.9917
+    },
+    {
+      "stage": "after_first_optimizer_step",
+      "allocated_gb": 0.0403,
+      "reserved_gb": 0.125,
+      "max_allocated_gb": 0.1048,
+      "max_reserved_gb": 0.125,
+      "free_gb": 14.541,
+      "total_gb": 15.9917
+    },
+    {
+      "stage": "after_run",
+      "allocated_gb": 0.0403,
+      "reserved_gb": 0.125,
+      "max_allocated_gb": 0.1128,
+      "max_reserved_gb": 0.125,
+      "free_gb": 14.541,
+      "total_gb": 15.9917
+    }
+  ],
+  "tokens_per_second": 1735.45,
+  "avg_step_time_s": 0.0738,
+  "oom": {
+    "happened": false,
+    "stage": "",
+    "message": ""
+  },
+  "measured": {
+    "peak_allocated_gb": 0.1128,
+    "peak_reserved_gb": 0.125,
+    "peak_total_gb": 0.125,
+    "final_allocated_gb": 0.0403,
+    "final_reserved_gb": 0.125,
+    "loss_last_step": 10.821707725524902
+  },
+  "estimated_total_gb": 2.08,
+  "notes": [],
+  "success": true,
+  "method": "lora"
+}

@@ -1,0 +1,63 @@
+{
+  "samples": [
+    {
+      "gpu_name": "NVIDIA GeForce RTX 4080",
+      "torch_version": "2.6.0+cu124",
+      "cuda_version": "12.4",
+      "model_family": "qwen2",
+      "method": "qlora",
+      "seq_len": 1024,
+      "micro_batch_size": 1,
+      "estimated_total_gb": 2.4059,
+      "measured_total_gb": 3.3027
+    },
+    {
+      "gpu_name": "NVIDIA GeForce RTX 4080",
+      "torch_version": "2.6.0+cu124",
+      "cuda_version": "12.4",
+      "model_family": "qwen2",
+      "method": "qlora",
+      "seq_len": 1024,
+      "micro_batch_size": 1,
+      "estimated_total_gb": 2.9981,
+      "measured_total_gb": 4.3574
+    },
+    {
+      "gpu_name": "NVIDIA GeForce RTX 4080",
+      "torch_version": "2.6.0+cu124",
+      "cuda_version": "12.4",
+      "model_family": "qwen2",
+      "method": "qlora",
+      "seq_len": 2048,
+      "micro_batch_size": 1,
+      "estimated_total_gb": 3.1622,
+      "measured_total_gb": 7.0977
+    },
+    {
+      "gpu_name": "NVIDIA GeForce RTX 4080",
+      "torch_version": "2.6.0+cu124",
+      "cuda_version": "12.4",
+      "model_family": "qwen2",
+      "method": "qlora",
+      "seq_len": 1024,
+      "micro_batch_size": 1,
+      "estimated_total_gb": 3.864,
+      "measured_total_gb": 5.5371
+    },
+    {
+      "gpu_name": "NVIDIA GeForce RTX 4080",
+      "torch_version": "2.6.0+cu124",
+      "cuda_version": "12.4",
+      "model_family": "gpt2",
+      "method": "lora",
+      "seq_len": 128,
+      "micro_batch_size": 1,
+      "estimated_total_gb": 2.08,
+      "measured_total_gb": 0.125
+    }
+  ],
+  "activation_scale": 1.3127550905283907,
+  "weights_scale": 1.3127550905283907,
+  "overhead_scale": 1.3127550905283907,
+  "note": "Fit from 5 sample(s); mean measured/estimated ratio = 1.313. Applied uniformly to weights + activations + CUDA overhead; safety_margin left untouched."
+}

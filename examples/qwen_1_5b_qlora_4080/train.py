@@ -6,8 +6,8 @@ Run:
 This script is intentionally short. It assumes a single GPU and a JSONL
 dataset whose rows follow the format documented in dataset_format.md.
 
-Generated for model: {{ model_id }}
-Method: {{ method }} (LoRA rank={{ lora_rank }}, target_modules={{ target_modules }})
+Generated for model: Qwen/Qwen2.5-1.5B-Instruct
+Method: qlora (LoRA rank=16, target_modules=['q_proj', 'k_proj', 'v_proj', 'o_proj'])
 """
 
 from __future__ import annotations
@@ -33,27 +33,27 @@ from transformers import (
 
 @dataclass
 class Config:
-    model_id: str = "{{ model_id }}"
+    model_id: str = "Qwen/Qwen2.5-1.5B-Instruct"
     output_dir: str = "output"
     dataset_path: str = "data/sample.jsonl"
-    seq_len: int = {{ seq_len }}
-    micro_batch_size: int = {{ micro_batch_size }}
-    gradient_accumulation_steps: int = {{ gradient_accumulation_steps }}
-    learning_rate: float = {{ learning_rate }}
-    max_steps: int = {{ max_steps }}
+    seq_len: int = 1024
+    micro_batch_size: int = 1
+    gradient_accumulation_steps: int = 8
+    learning_rate: float = 0.0002
+    max_steps: int = 10
     logging_steps: int = 1
     save_steps: int = 100
     seed: int = 42
-    gradient_checkpointing: bool = {{ "True" if gradient_checkpointing else "False" }}
-    attention_implementation: str = "{{ attention_implementation }}"
-    method: str = "{{ method }}"
-    lora_rank: int = {{ lora_rank }}
-    lora_alpha: int = {{ lora_alpha }}
-    lora_dropout: float = {{ lora_dropout }}
+    gradient_checkpointing: bool = True
+    attention_implementation: str = "sdpa"
+    method: str = "qlora"
+    lora_rank: int = 16
+    lora_alpha: int = 32
+    lora_dropout: float = 0.05
     target_modules: list = None  # type: ignore[assignment]
-    base_dtype: str = "{{ base_dtype }}"
-    quantization: str = "{{ quantization }}"
-    optimizer: str = "{{ optimizer }}"
+    base_dtype: str = "bf16"
+    quantization: str = "nf4_double_quant"
+    optimizer: str = "paged_adamw_8bit"
 
     @classmethod
     def from_yaml(cls, path: str | Path) -> "Config":
@@ -61,7 +61,7 @@ class Config:
         kwargs = {f: data[f] for f in cls.__dataclass_fields__ if f in data}
         c = cls(**kwargs)
         if c.target_modules is None:
-            c.target_modules = list({{ target_modules | tojson }})
+            c.target_modules = list(["q_proj", "k_proj", "v_proj", "o_proj"])
         return c
 
 

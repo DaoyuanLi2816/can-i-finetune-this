@@ -122,6 +122,16 @@ measurements on your machine.
 RTX 4080 (16 GB). These are not synthetic. If a configuration was not run, the
 table says "not run", not a guessed number.
 
+Highlights (more in the doc):
+
+| model | method | seq_len | measured peak | tok/sec |
+| --- | --- | --- | --- | --- |
+| `Qwen/Qwen2.5-0.5B-Instruct` | qlora | 1024 | 3.30 GB | 1995 |
+| `Qwen/Qwen2.5-1.5B-Instruct` | qlora | 1024 | 4.36 GB | 1352 |
+| `Qwen/Qwen2.5-1.5B-Instruct` | qlora | 2048 | 7.10 GB | 1470 |
+| `Qwen/Qwen2.5-3B-Instruct` | qlora | 1024 | 5.54 GB | 1158 |
+| `sshleifer/tiny-gpt2` (smoke) | lora | 128 | 0.12 GB | 1735 |
+
 ---
 
 ## Repository layout

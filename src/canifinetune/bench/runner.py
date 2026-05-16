@@ -117,6 +117,15 @@ def _build_optimizer(params, name: str):
     return torch.optim.AdamW(params, lr=2e-4)
 
 
+def _model_dtype_kwarg(value: Any) -> dict[str, Any]:
+    """Return ``{"dtype": value}`` for transformers ≥ 5.x, ``{"torch_dtype": value}`` for older.
+
+    transformers 5.0 renamed ``torch_dtype`` → ``dtype``. We prefer the new
+    name; if the installed transformers complains, the caller falls back.
+    """
+    return {"dtype": value}
+
+
 def _build_model(cfg: BenchConfig):
     import torch  # type: ignore
     from transformers import AutoConfig, AutoModelForCausalLM  # type: ignore
@@ -125,11 +134,14 @@ def _build_model(cfg: BenchConfig):
 
     # bf16 vs fp16 dtype
     if cfg.base_dtype.lower() == "bf16":
-        kwargs["torch_dtype"] = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
+        dtype_value = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
     elif cfg.base_dtype.lower() == "fp16":
-        kwargs["torch_dtype"] = torch.float16
+        dtype_value = torch.float16
     elif cfg.base_dtype.lower() == "fp32":
-        kwargs["torch_dtype"] = torch.float32
+        dtype_value = torch.float32
+    else:
+        dtype_value = torch.float32
+    kwargs.update(_model_dtype_kwarg(dtype_value))
 
     if cfg.method == "qlora":
         try:
@@ -144,19 +156,38 @@ def _build_model(cfg: BenchConfig):
                 bnb_4bit_quant_type="nf4",
                 bnb_4bit_use_double_quant=cfg.quantization == "nf4_double_quant",
             )
-            kwargs["torch_dtype"] = compute_dtype
+            kwargs.update(_model_dtype_kwarg(compute_dtype))
         except Exception as e:
             log.warning("BitsAndBytesConfig unavailable (%s); falling back to LoRA without 4-bit.", e)
 
     if cfg.attention_implementation in {"sdpa", "flash_attention_2", "eager"}:
         kwargs["attn_implementation"] = cfg.attention_implementation
 
+    # For QLoRA, bitsandbytes places shards on GPU automatically when
+    # device_map is set. For LoRA / full, we load on CPU and `.to(device)` after.
+    if cfg.method == "qlora" and cfg.device.startswith("cuda"):
+        kwargs["device_map"] = {"": 0}
+
+    def _load(**extra: Any):
+        merged = {**kwargs, **extra}
+        return AutoModelForCausalLM.from_pretrained(cfg.model_id, **merged)
+
     try:
-        model = AutoModelForCausalLM.from_pretrained(cfg.model_id, **kwargs)
-    except TypeError:
-        # Older transformers versions may not support attn_implementation.
+        model = _load()
+    except TypeError as e:
         kwargs.pop("attn_implementation", None)
-        model = AutoModelForCausalLM.from_pretrained(cfg.model_id, **kwargs)
+        if "dtype" in kwargs:
+            kwargs["torch_dtype"] = kwargs.pop("dtype")
+        try:
+            model = _load()
+        except TypeError:
+            log.warning("Retrying without dtype/torch_dtype after %s", e)
+            kwargs.pop("torch_dtype", None)
+            kwargs.pop("dtype", None)
+            model = _load()
+
+    if cfg.method != "qlora" and cfg.device.startswith("cuda"):
+        model = model.to(cfg.device)
 
     # For QLoRA we need to prepare the model for 4-bit fine-tuning.
     if cfg.method == "qlora":

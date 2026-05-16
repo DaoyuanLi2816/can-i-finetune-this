@@ -6,8 +6,8 @@ Run:
 This script is intentionally short. It assumes a single GPU and a JSONL
 dataset whose rows follow the format documented in dataset_format.md.
 
-Generated for model: {{ model_id }}
-Method: {{ method }} (LoRA rank={{ lora_rank }}, target_modules={{ target_modules }})
+Generated for model: sshleifer/tiny-gpt2
+Method: lora (LoRA rank=8, target_modules=['c_attn', 'c_proj'])
 """
 
 from __future__ import annotations
@@ -33,27 +33,27 @@ from transformers import (
 
 @dataclass
 class Config:
-    model_id: str = "{{ model_id }}"
+    model_id: str = "sshleifer/tiny-gpt2"
     output_dir: str = "output"
     dataset_path: str = "data/sample.jsonl"
-    seq_len: int = {{ seq_len }}
-    micro_batch_size: int = {{ micro_batch_size }}
-    gradient_accumulation_steps: int = {{ gradient_accumulation_steps }}
-    learning_rate: float = {{ learning_rate }}
-    max_steps: int = {{ max_steps }}
+    seq_len: int = 128
+    micro_batch_size: int = 1
+    gradient_accumulation_steps: int = 1
+    learning_rate: float = 0.0002
+    max_steps: int = 5
     logging_steps: int = 1
     save_steps: int = 100
     seed: int = 42
-    gradient_checkpointing: bool = {{ "True" if gradient_checkpointing else "False" }}
-    attention_implementation: str = "{{ attention_implementation }}"
-    method: str = "{{ method }}"
-    lora_rank: int = {{ lora_rank }}
-    lora_alpha: int = {{ lora_alpha }}
-    lora_dropout: float = {{ lora_dropout }}
+    gradient_checkpointing: bool = False
+    attention_implementation: str = "eager"
+    method: str = "lora"
+    lora_rank: int = 8
+    lora_alpha: int = 32
+    lora_dropout: float = 0.05
     target_modules: list = None  # type: ignore[assignment]
-    base_dtype: str = "{{ base_dtype }}"
-    quantization: str = "{{ quantization }}"
-    optimizer: str = "{{ optimizer }}"
+    base_dtype: str = "fp32"
+    quantization: str = "bf16"
+    optimizer: str = "adamw_torch"
 
     @classmethod
     def from_yaml(cls, path: str | Path) -> "Config":
@@ -61,7 +61,7 @@ class Config:
         kwargs = {f: data[f] for f in cls.__dataclass_fields__ if f in data}
         c = cls(**kwargs)
         if c.target_modules is None:
-            c.target_modules = list({{ target_modules | tojson }})
+            c.target_modules = list(["c_attn", "c_proj"])
         return c
 
 

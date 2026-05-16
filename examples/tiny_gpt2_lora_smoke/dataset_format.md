@@ -1,0 +1,35 @@
+# Dataset format
+
+`train.py` accepts JSONL files in either of two shapes. Pick whichever fits
+your data and put the file at `data/your_dataset.jsonl`, then pass
+`--dataset data/your_dataset.jsonl`.
+
+## A. Messages format (recommended for chat models)
+
+```jsonl
+{"messages": [{"role": "user", "content": "Translate to French: I am hungry."}, {"role": "assistant", "content": "J'ai faim."}]}
+{"messages": [{"role": "user", "content": "Summarize: ..."}, {"role": "assistant", "content": "..."}]}
+```
+
+A system message is allowed but currently ignored by `train.py` (it bakes the
+instruction into the user turn).
+
+## B. Alpaca-style format
+
+```jsonl
+{"instruction": "Translate to French.", "input": "I am hungry.", "output": "J'ai faim."}
+{"instruction": "Summarize the paragraph.", "input": "<long text>", "output": "<summary>"}
+```
+
+`input` may be an empty string.
+
+## Notes
+
+- Rows longer than `seq_len` (128) will be truncated.
+- Rows shorter than `seq_len` will be padded with the tokenizer's pad token
+  (or EOS if no pad token is defined), and the loss will still be computed on
+  the response portion via standard causal LM cross-entropy.
+- We do **not** mask the prompt by default. If you want loss on responses only,
+  edit `_format_example` in `train.py`.
+- Keep your dataset out of version control if it is private. The bundled
+  `data/sample.jsonl` is synthetic and safe to commit.

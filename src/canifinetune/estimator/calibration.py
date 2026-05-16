@@ -93,29 +93,29 @@ def _select_relevant(samples: list[CalibrationSample], request: EstimateRequest,
 def fit_calibration_from_samples(samples: list[CalibrationSample]) -> Calibration:
     """Fit simple multiplicative scalars from a set of samples.
 
-    Strategy: average of ``measured/estimated`` ratios per category. We split
-    the correction crudely into "activation_scale" for short-seq vs "weights_scale"
-    for long-seq, but in practice a single scale applied to total memory is the
-    most reliable thing we can fit with few samples.
+    Strategy: a single ``measured / estimated`` ratio applied to every
+    "real" memory component (weights, activations, CUDA overhead). Empirically
+    this is the most reliable thing to fit when we only have a handful of
+    samples and the dominant source of error (4-bit unpacking buffers, fused
+    optimizer workspaces, allocator fragmentation) scales roughly with the
+    full footprint.
+
+    ``safety_margin`` is intentionally left unscaled — it is a *policy* knob,
+    not a measurement.
     """
     if not samples:
         return Calibration()
     ratios = [s.ratio for s in samples]
     mean_ratio = sum(ratios) / len(ratios)
-    # Spread the correction across components proportionally. We bias the
-    # activation scaling because activations are the noisiest component.
-    activation_scale = float(mean_ratio)
-    weights_scale = 1.0  # weights are easy to estimate exactly
-    overhead_scale = 1.0
     return Calibration(
         samples=list(samples),
-        activation_scale=activation_scale,
-        weights_scale=weights_scale,
-        overhead_scale=overhead_scale,
+        activation_scale=float(mean_ratio),
+        weights_scale=float(mean_ratio),
+        overhead_scale=float(mean_ratio),
         note=(
             f"Fit from {len(samples)} sample(s); mean measured/estimated ratio "
-            f"= {mean_ratio:.3f}. Applied as activation scale; "
-            "estimator total = static_model + (activations*scale) + other."
+            f"= {mean_ratio:.3f}. Applied uniformly to weights + activations + "
+            "CUDA overhead; safety_margin left untouched."
         ),
     )
 
