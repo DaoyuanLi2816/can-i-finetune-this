@@ -114,7 +114,13 @@ def _build_context(req: RecipeRequest) -> dict:
         "estimate_feasible": est.feasible,
         "estimate_confidence": est.confidence,
         "uses_4bit": req.method == "qlora",
-        "extra_deps": ["bitsandbytes>=0.43"] if req.method == "qlora" else [],
+        "extra_deps": (
+            ["bitsandbytes>=0.43"]
+            if req.method == "qlora"
+            or "8bit" in req.optimizer
+            or req.optimizer.startswith("paged")
+            else []
+        ),
     }
 
 
