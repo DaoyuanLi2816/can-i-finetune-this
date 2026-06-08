@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><style>
+  :root{--bg:#0b1220;--card:#ffffff;--ink:#0f172a;--muted:#64748b;--line:#7c8aa5;
+        --in:#6366f1;--est:#0ea5e9;--ok:#10b981;--rec:#f59e0b;}
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{width:1160px;height:660px}
+  body{font-family:"Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif;
+       background:radial-gradient(1300px 760px at 22% -12%,#1c2740 0%,var(--bg) 58%);
+       color:#e2e8f0;padding:34px 44px 28px}
+  h1{font-size:29px;font-weight:800;letter-spacing:.2px}
+  h1 .q{color:#38bdf8}
+  .sub{color:#94a3b8;font-size:14.5px;margin-top:5px;margin-bottom:22px}
+  .band{display:flex;align-items:center;gap:14px;justify-content:center}
+  .lbl{writing-mode:vertical-rl;transform:rotate(180deg);font-size:11px;font-weight:800;
+       letter-spacing:2px;text-transform:uppercase;color:#64748b;flex:0 0 auto}
+  .card{background:var(--card);color:var(--ink);border-radius:14px;padding:13px 15px;
+        box-shadow:0 12px 28px rgba(2,6,23,.5),0 2px 5px rgba(2,6,23,.35);border-top:4px solid var(--in)}
+  .card .t{font-size:15px;font-weight:700}
+  .card .d{font-size:12px;color:var(--muted);margin-top:3px;line-height:1.5}
+  .in .card{flex:1}
+  .group{flex:1;border:1.5px dashed #3b4a66;border-radius:18px;padding:16px 16px 12px;position:relative;background:rgba(148,163,184,.05)}
+  .group>.gt{position:absolute;top:-11px;left:18px;background:#0ea5e9;color:#04222f;font-size:11px;
+             font-weight:800;letter-spacing:1.5px;text-transform:uppercase;padding:3px 10px;border-radius:999px}
+  .chips{display:flex;align-items:stretch;gap:0}
+  .chip{flex:1;background:#fff;color:var(--ink);border-radius:11px;padding:11px 11px;text-align:center;
+        box-shadow:0 6px 16px rgba(2,6,23,.4);border-top:4px solid var(--est)}
+  .chip .ct{font-size:13.5px;font-weight:700}
+  .chip .cd{font-size:11px;color:var(--muted);margin-top:3px;line-height:1.4}
+  .a{display:flex;align-items:center;justify-content:center;color:var(--line)}
+  .a.h{width:30px;flex:0 0 30px}.a.h svg{width:22px;height:22px}
+  .a.v{height:26px}.a.v svg{width:24px;height:24px}
+  .cal{margin-top:9px;font-size:11.5px;color:#94a3b8;text-align:center}
+  .cal b{color:#7dd3fc}
+  .out .card{flex:1}
+  .out .card.v{border-top-color:var(--ok)} .out .card.r{border-top-color:var(--rec)}
+  .verd{display:flex;gap:8px;margin-top:6px;font-size:11.5px;font-weight:700}
+  .verd span{padding:3px 8px;border-radius:999px}
+  .vy{background:#dcfce7;color:#166534}.vm{background:#fef9c3;color:#854d0e}.vn{background:#fee2e2;color:#991b1b}
+  .mono{font-family:"Cascadia Code",Consolas,monospace;font-size:11px;color:#475569}
+</style></head>
+<body>
+  <h1>can&#8209;i&#8209;finetune&#8209;this <span class="q">&mdash; will this model fit on my GPU?</span></h1>
+  <div class="sub">Estimates the LoRA / QLoRA / full fine&#8209;tuning VRAM budget, then generates a ready&#8209;to&#8209;run recipe.</div>
+
+  <div class="band in">
+    <div class="lbl">inputs</div>
+    <div class="card" style="border-top-color:var(--in)"><div class="t">HF model</div><div class="d">e.g. Qwen2.5&#8209;7B&#8209;Instruct</div></div>
+    <div class="card" style="border-top-color:var(--in)"><div class="t">GPU</div><div class="d">VRAM, e.g. RTX 4080 / 16 GB</div></div>
+    <div class="card" style="border-top-color:var(--in)"><div class="t">Method</div><div class="d">full &middot; LoRA &middot; QLoRA</div></div>
+  </div>
+
+  <div class="a v"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v15M6 13l6 6 6-6"/></svg></div>
+
+  <div class="band">
+    <div class="group"><span class="gt">estimator</span>
+      <div class="chips">
+        <div class="chip"><div class="ct">Model metadata</div><div class="cd">params &middot; dtype<br>layers &middot; GQA</div></div>
+        <div class="a h"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h15M13 6l6 6-6 6"/></svg></div>
+        <div class="chip"><div class="ct">Memory formulas</div><div class="cd">weights &middot; grads<br>optimizer &middot; acts</div></div>
+        <div class="a h"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h15M13 6l6 6-6 6"/></svg></div>
+        <div class="chip"><div class="ct">VRAM budget</div><div class="cd">sum the<br>components</div></div>
+        <div class="a h"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h15M13 6l6 6-6 6"/></svg></div>
+        <div class="chip"><div class="ct">Calibration</div><div class="cd">&times; measured<br>RTX 4080 factor</div></div>
+        <div class="a h"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h15M13 6l6 6-6 6"/></svg></div>
+        <div class="chip"><div class="ct">Recommender</div><div class="cd">feasible? &middot;<br>safe configs</div></div>
+      </div>
+      <div class="cal">&#8593; calibrated on <b>real RTX&nbsp;4080 benchmark runs</b> committed in <span class="mono">benchmarks/</span></div>
+    </div>
+  </div>
+
+  <div class="a v"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v15M6 13l6 6 6-6"/></svg></div>
+
+  <div class="band out">
+    <div class="lbl">outputs</div>
+    <div class="card v"><div class="t">Feasibility verdict</div>
+      <div class="verd"><span class="vy">Fits</span><span class="vm">Tight</span><span class="vn">Won&rsquo;t fit</span></div></div>
+    <div class="card r"><div class="t">Recommended config</div><div class="d">seq&#8209;len &middot; batch &middot; LoRA rank &middot; optimizer &middot; quantization</div></div>
+    <div class="card r"><div class="t">Recipe folder</div><div class="d mono">train.py &middot; config.yaml &middot; run.sh &middot; eval_smoke.py &middot; &hellip;</div></div>
+  </div>
+</body></html>
