@@ -256,15 +256,34 @@ def main() -> int:
             return {"text": text}
 
         sft_ds = sft_ds.map(format_fn)
-        trainer = SFTTrainer(
-            model=model,
-            args=train_args,
-            train_dataset=sft_ds,
-            tokenizer=tokenizer,
-            max_seq_length=cfg.seq_len,
-            dataset_text_field="text",
-            packing=False,
-        )
+        try:
+            # Modern TRL (>= ~0.12): SFT-specific args live on SFTConfig and the
+            # tokenizer is passed as processing_class.
+            from trl import SFTConfig
+
+            sft_args = SFTConfig(
+                **train_args.to_dict(),
+                max_length=cfg.seq_len,
+                dataset_text_field="text",
+                packing=False,
+            )
+            trainer = SFTTrainer(
+                model=model,
+                args=sft_args,
+                train_dataset=sft_ds,
+                processing_class=tokenizer,
+            )
+        except (TypeError, ImportError):
+            # Legacy TRL (< ~0.12) keyword API.
+            trainer = SFTTrainer(
+                model=model,
+                args=train_args,
+                train_dataset=sft_ds,
+                tokenizer=tokenizer,
+                max_seq_length=cfg.seq_len,
+                dataset_text_field="text",
+                packing=False,
+            )
     else:
         from transformers import DataCollatorForLanguageModeling, Trainer
         collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)
