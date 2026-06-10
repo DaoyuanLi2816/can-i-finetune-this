@@ -1,0 +1,98 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 250" role="img" aria-label="canifinetune — estimate, benchmark, and generate fine-tuning recipes for LLMs on consumer GPUs">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="55%" stop-color="#022c22"/>
+      <stop offset="100%" stop-color="#0f766e"/>
+    </linearGradient>
+    <clipPath id="bgclip">
+      <rect x="0" y="0" width="880" height="250" rx="16"/>
+    </clipPath>
+  </defs>
+
+  <rect x="0" y="0" width="880" height="250" rx="16" fill="url(#bg)"/>
+  <g clip-path="url(#bgclip)">
+    <circle cx="790" cy="0" r="190" fill="#2dd4bf" opacity="0.07"/>
+    <circle cx="350" cy="265" r="150" fill="#38bdf8" opacity="0.05"/>
+  </g>
+
+  <!-- ===== left column: brand ===== -->
+  <text x="40" y="84" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="42" font-weight="800" fill="#ffffff">canifinetune</text>
+  <rect x="42" y="94" width="64" height="3" rx="1.5" fill="#34d399" opacity="0.9"/>
+  <text x="40" y="124" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="15" fill="#cbd5e1">Can I fine-tune this LLM on my GPU?</text>
+
+  <!-- CLI chips -->
+  <g font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12" text-anchor="middle">
+    <rect x="40" y="140" width="70" height="24" rx="12" fill="#34d399" fill-opacity="0.12" stroke="#34d399" stroke-opacity="0.65"/>
+    <text x="75" y="156" fill="#6ee7b7">estimate</text>
+    <rect x="118" y="140" width="52" height="24" rx="12" fill="#60a5fa" fill-opacity="0.12" stroke="#60a5fa" stroke-opacity="0.65"/>
+    <text x="144" y="156" fill="#93c5fd">bench</text>
+    <rect x="178" y="140" width="58" height="24" rx="12" fill="#fbbf24" fill-opacity="0.12" stroke="#fbbf24" stroke-opacity="0.65"/>
+    <text x="207" y="156" fill="#fde68a">recipe</text>
+  </g>
+
+  <!-- context pill -->
+  <rect x="40" y="178" width="200" height="28" rx="14" fill="#34d399" fill-opacity="0.10" stroke="#34d399" stroke-opacity="0.55"/>
+  <text x="54" y="196" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12.5" fill="#a7f3d0">LoRA &#183; QLoRA &#183; 12&#8211;24 GB GPUs</text>
+
+  <!-- pip install pill -->
+  <rect x="40" y="214" width="216" height="26" rx="13" fill="#ffffff" fill-opacity="0.07" stroke="#ffffff" stroke-opacity="0.18"/>
+  <text x="54" y="231" font-family="ui-monospace, SFMono-Regular, Consolas, 'Courier New', monospace" font-size="12.5" fill="#e2e8f0">$ pip install canifinetune</text>
+
+  <!-- ===== card 1: estimate up front ===== -->
+  <g>
+    <rect x="350" y="30" width="156" height="190" rx="12" fill="#ffffff" fill-opacity="0.05" stroke="#ffffff" stroke-opacity="0.13"/>
+    <circle cx="380" cy="62" r="16" fill="#38bdf8" fill-opacity="0.14" stroke="#38bdf8" stroke-opacity="0.55" stroke-width="1.4"/>
+    <g stroke="#38bdf8" stroke-width="1.8" stroke-linecap="round" fill="none">
+      <path d="M 371 66 A 9 9 0 0 1 389 66"/>
+      <line x1="380" y1="66" x2="386" y2="59"/>
+    </g>
+    <circle cx="380" cy="66" r="1.6" fill="#38bdf8"/>
+    <g font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
+      <text x="366" y="102" font-size="14" font-weight="700" fill="#f1f5f9">Estimate</text>
+      <text x="366" y="120" font-size="14" font-weight="700" fill="#f1f5f9">up front</text>
+      <text x="366" y="142" font-size="11.5" fill="#94a3b8">fits or OOMs, plus a</text>
+      <text x="366" y="158" font-size="11.5" fill="#94a3b8">batch &#183; seq &#183; rank plan</text>
+      <text x="366" y="180" font-size="10.5" fill="#fcd34d" fill-opacity="0.9">no 14 GB download</text>
+      <text x="366" y="195" font-size="10.5" fill="#fcd34d" fill-opacity="0.9">to find out</text>
+    </g>
+  </g>
+
+  <!-- ===== card 2: local benchmarks ===== -->
+  <g>
+    <rect x="520" y="30" width="156" height="190" rx="12" fill="#ffffff" fill-opacity="0.05" stroke="#ffffff" stroke-opacity="0.13"/>
+    <circle cx="550" cy="62" r="16" fill="#34d399" fill-opacity="0.14" stroke="#34d399" stroke-opacity="0.55" stroke-width="1.4"/>
+    <g stroke="#34d399" stroke-width="1.8" stroke-linecap="round">
+      <line x1="544" y1="68" x2="544" y2="60"/>
+      <line x1="550" y1="68" x2="550" y2="55"/>
+      <line x1="556" y1="68" x2="556" y2="63"/>
+    </g>
+    <g font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
+      <text x="536" y="102" font-size="14" font-weight="700" fill="#f1f5f9">Local</text>
+      <text x="536" y="120" font-size="14" font-weight="700" fill="#f1f5f9">benchmarks</text>
+      <text x="536" y="142" font-size="11.5" fill="#94a3b8">measure real steps</text>
+      <text x="536" y="158" font-size="11.5" fill="#94a3b8">on your own card</text>
+      <text x="536" y="180" font-size="10.5" fill="#fcd34d" fill-opacity="0.9">calibrates the</text>
+      <text x="536" y="195" font-size="10.5" fill="#fcd34d" fill-opacity="0.9">estimator with data</text>
+    </g>
+  </g>
+
+  <!-- ===== card 3: ready-to-run recipes ===== -->
+  <g>
+    <rect x="690" y="30" width="156" height="190" rx="12" fill="#ffffff" fill-opacity="0.05" stroke="#ffffff" stroke-opacity="0.13"/>
+    <circle cx="720" cy="62" r="16" fill="#a78bfa" fill-opacity="0.14" stroke="#a78bfa" stroke-opacity="0.55" stroke-width="1.4"/>
+    <g stroke="#a78bfa" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none">
+      <rect x="714" y="53" width="12" height="17" rx="2"/>
+      <line x1="717" y1="59" x2="723" y2="59"/>
+      <line x1="717" y1="64" x2="723" y2="64"/>
+    </g>
+    <g font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
+      <text x="706" y="102" font-size="14" font-weight="700" fill="#f1f5f9">Ready-to-run</text>
+      <text x="706" y="120" font-size="14" font-weight="700" fill="#f1f5f9">recipes</text>
+      <text x="706" y="142" font-size="11.5" fill="#94a3b8">HF + PEFT + TRL</text>
+      <text x="706" y="158" font-size="11.5" fill="#94a3b8">training scripts</text>
+      <text x="706" y="180" font-size="10.5" fill="#fcd34d" fill-opacity="0.9">one command from</text>
+      <text x="706" y="195" font-size="10.5" fill="#fcd34d" fill-opacity="0.9">plan to training</text>
+    </g>
+  </g>
+</svg>
