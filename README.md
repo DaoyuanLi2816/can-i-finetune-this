@@ -13,7 +13,7 @@
 
 **Estimate, benchmark, and generate fine-tuning recipes for LLMs on consumer GPUs.**
 
-![can-i-finetune-this architecture](docs/architecture.png)
+![can-i-finetune-this architecture](https://raw.githubusercontent.com/DaoyuanLi2816/can-i-finetune-this/main/docs/architecture.png)
 
 You have one consumer-grade NVIDIA GPU. You want to fine-tune an open-weight LLM
 with LoRA or QLoRA, but you do not want to download 14 GB of weights just to
