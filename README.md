@@ -1,9 +1,15 @@
-# can-i-finetune-this
+<p align="center">
+  <img src="https://raw.githubusercontent.com/DaoyuanLi2816/can-i-finetune-this/main/docs/banner.svg" alt="canifinetune — Can I fine-tune this LLM on my GPU? Estimate up front, run local benchmarks, get ready-to-run LoRA/QLoRA recipes for 12–24 GB consumer GPUs." width="880">
+</p>
+
+<div align="center">
 
 [![CI](https://github.com/DaoyuanLi2816/can-i-finetune-this/actions/workflows/ci.yml/badge.svg)](https://github.com/DaoyuanLi2816/can-i-finetune-this/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/canifinetune.svg)](https://pypi.org/project/canifinetune/)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+
+</div>
 
 **Estimate, benchmark, and generate fine-tuning recipes for LLMs on consumer GPUs.**
 
