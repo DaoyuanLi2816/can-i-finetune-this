@@ -172,6 +172,16 @@ def suggest_degradations(req: EstimateRequest) -> list[DegradationStep]:
         state = step.request
         return step.estimate.feasible == "yes"
 
+    # A full fine-tune is dominated by full-model gradients + optimizer
+    # states; no batch/seq tweak can save it. Suggest PEFT first.
+    if state.method == "full" and push(
+        "Switch from full fine-tune to QLoRA (NF4 + double quant + paged 8-bit AdamW)",
+        method="qlora",
+        quantization="nf4_double_quant",
+        optimizer="paged_adamw_8bit",
+    ):
+        return steps
+
     if state.micro_batch_size > 1 and push("Drop micro_batch_size to 1", micro_batch_size=1):
         return steps
 
@@ -183,10 +193,12 @@ def suggest_degradations(req: EstimateRequest) -> list[DegradationStep]:
     if state.seq_len > 1024 and push("Halve seq_len", seq_len=max(1024, state.seq_len // 2)):
         return steps
 
-    if state.lora_rank > 8 and push("Halve LoRA rank", lora_rank=max(8, state.lora_rank // 2)):
+    if state.method != "full" and state.lora_rank > 8 and push(
+        "Halve LoRA rank", lora_rank=max(8, state.lora_rank // 2)
+    ):
         return steps
 
-    if state.lora_target_scope == "all_linear" and push(
+    if state.method != "full" and state.lora_target_scope == "all_linear" and push(
         "Restrict LoRA target_modules to attention only",
         lora_target_scope="attention",
     ):
@@ -208,7 +220,9 @@ def suggest_degradations(req: EstimateRequest) -> list[DegradationStep]:
     if state.seq_len > 512 and push("Drop seq_len to 512", seq_len=512):
         return steps
 
-    if state.lora_rank > 4 and push("Drop LoRA rank to 4", lora_rank=4):
+    if state.method != "full" and state.lora_rank > 4 and push(
+        "Drop LoRA rank to 4", lora_rank=4
+    ):
         return steps
 
     # Last resort: caller has to pick a smaller model. We surface that as a
