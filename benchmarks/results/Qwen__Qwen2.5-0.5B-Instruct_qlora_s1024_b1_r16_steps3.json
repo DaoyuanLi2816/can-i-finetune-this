@@ -19,7 +19,7 @@
     "record_estimate": true
   },
   "model_family": "qwen2",
-  "timestamp": "2026-05-16T06:49:43Z",
+  "timestamp": "2026-07-02T05:18:37Z",
   "env": {
     "torch_version": "2.6.0+cu124",
     "cuda_version": "12.4",
@@ -109,8 +109,8 @@
       "total_gb": 15.9917
     }
   ],
-  "tokens_per_second": 1995.33,
-  "avg_step_time_s": 0.5132,
+  "tokens_per_second": 3336.57,
+  "avg_step_time_s": 0.3069,
   "oom": {
     "happened": false,
     "stage": "",
@@ -122,9 +122,9 @@
     "peak_total_gb": 3.3027,
     "final_allocated_gb": 1.2965,
     "final_reserved_gb": 3.3027,
-    "loss_last_step": 13.03083610534668
+    "loss_last_step": 13.022664070129395
   },
-  "estimated_total_gb": 2.4059,
+  "estimated_total_gb": 5.0111,
   "notes": [],
   "success": true,
   "method": "qlora"

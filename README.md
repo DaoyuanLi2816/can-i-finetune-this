@@ -44,29 +44,36 @@ canifinetune compare  --benchmarks benchmarks/results --out compare.md
 What `canifinetune estimate` actually prints:
 
 ```text
-+-------- Qwen/Qwen2.5-1.5B-Instruct  (qlora) --------+
-| feasible: YES    ratio = 0.20    confidence = medium |
++-------- Qwen/Qwen2.5-1.5B-Instruct  (qlora) ---------+
+| feasible: YES    ratio = 0.53    confidence = medium |
 +------------------------------------------------------+
-       Memory breakdown (GB)
-+---------------------------------+
-| Component             |   Value |
-|-----------------------+---------|
-| static model          |   0.737 |
-| quantization overhead |   0.018 |
-| trainable params      |  4.4 MB |
-| gradients             |   0.008 |
-| optimizer states      |   0.010 |
-| activations           |   0.328 |
-| CUDA / fragmentation  |   1.280 |
-| safety margin         |   0.800 |
-| total                 |   3.163 |
-+---------------------------------+
+      Memory breakdown (GB)
++--------------------------------+
+| Component             |  Value |
+|-----------------------+--------|
+| static model          |  1.517 |
+| quantization overhead |  0.072 |
+| trainable params      | 4.4 MB |
+| gradients             |  0.016 |
+| optimizer states      |  0.010 |
+| activations           |  0.689 |
+| logits / loss         |  4.057 |
+| CUDA / fragmentation  |  1.280 |
+| safety margin         |  0.800 |
+| total                 |  8.441 |
++--------------------------------+
 ```
 
-Static estimate says 3.16 GB; on a real RTX 4080 the same config measures
-7.10 GB (heavy bitsandbytes unpacking buffers at seq_len=2048). `canifinetune
-bench` and `canifinetune calibrate` close that gap on your machine —
-that is the *point* of the project.
+On a real RTX 4080 this exact config peaks at 7.10 GB reserved — the
+estimate lands ~1.3 GB above it, on the safe side, instead of promising
+3 GB and OOM-ing. Two terms most static estimators miss do the work here:
+the **logits / cross-entropy chain** (`seq × vocab × ~14 B`; 4.1 GB for
+Qwen's 152k vocab at seq 2048, and gradient checkpointing does *not* remove
+it) and the **fp32 upcast of embeddings/norms** that
+`prepare_model_for_kbit_training` performs under QLoRA. Every coefficient
+was fitted against measured `torch.cuda` peaks — see
+`docs/rtx4080_baselines.md` — and `canifinetune bench` / `calibrate` can
+still ground the estimate on *your* machine.
 
 ---
 
@@ -139,12 +146,19 @@ That is not enough to know whether you can **train** it.
 
 This project tries to answer the harder question. It models:
 
-- Model weights, in fp32 / fp16 / bf16 / int8 / NF4 + double-quant
+- Model weights, in fp32 / fp16 / bf16 / int8 / NF4 + double-quant —
+  including the fact that QLoRA only quantizes the Linear layers while
+  embeddings / lm_head / norms are upcast to fp32 by
+  `prepare_model_for_kbit_training` (4 GB on an untied 7B!)
+- The logits / cross-entropy chain (`seq × batch × vocab × ~14 B`) — the
+  single biggest training buffer for modern 128k–152k-vocab models, and
+  one gradient checkpointing does not touch
 - LoRA / QLoRA trainable parameter count for typical `target_modules`
 - Gradients only for trainable parameters
 - AdamW vs 8-bit / paged AdamW optimizer states
-- Activations as a function of `seq_len`, `batch_size`, `hidden_size`, `num_layers`,
-  with and without gradient checkpointing
+- Activations as a function of `seq_len`, `batch_size`, `hidden_size`,
+  `intermediate_size`, `num_layers`, with and without gradient checkpointing,
+  with coefficients fitted to measured peaks on real hardware
 - A fragmentation / CUDA / buffer safety margin
 - A feasibility decision against your actual GPU
 - Concrete degradation suggestions when not feasible
@@ -160,17 +174,21 @@ measurements on your machine.
 
 `docs/rtx4080_baselines.md` contains real measurements collected on a single
 RTX 4080 (16 GB). These are not synthetic. If a configuration was not run, the
-table says "not run", not a guessed number.
+table says "not run", not a guessed number. The same runs are pinned as
+regression fixtures in `tests/test_estimator_accuracy.py`, so the estimator
+cannot silently drift away from measured reality.
 
 Highlights (more in the doc):
 
-| model | method | seq_len | measured peak | tok/sec |
-| --- | --- | --- | --- | --- |
-| `Qwen/Qwen2.5-0.5B-Instruct` | qlora | 1024 | 3.30 GB | 1995 |
-| `Qwen/Qwen2.5-1.5B-Instruct` | qlora | 1024 | 4.36 GB | 1352 |
-| `Qwen/Qwen2.5-1.5B-Instruct` | qlora | 2048 | 7.10 GB | 1470 |
-| `Qwen/Qwen2.5-3B-Instruct` | qlora | 1024 | 5.54 GB | 1158 |
-| `sshleifer/tiny-gpt2` (smoke) | lora | 128 | 0.12 GB | 1735 |
+| model | method | seq_len | estimated | measured peak | tok/sec |
+| --- | --- | --- | --- | --- | --- |
+| `Qwen/Qwen2.5-0.5B-Instruct` | qlora | 1024 | 5.01 GB | 3.30 GB | 3337 |
+| `Qwen/Qwen2.5-1.5B-Instruct` | qlora | 1024 | 6.07 GB | 4.36 GB | 2483 |
+| `Qwen/Qwen2.5-1.5B-Instruct` | qlora | 2048 | 8.44 GB | 7.10 GB | 2327 |
+| `Qwen/Qwen2.5-1.5B-Instruct` | qlora | 4096 | 13.19 GB | 13.56 GB | 1662 |
+| `Qwen/Qwen2.5-1.5B-Instruct` | qlora (no ckpt) | 1024 | 10.77 GB | 9.55 GB | 3003 |
+| `Qwen/Qwen2.5-3B-Instruct` | qlora | 1024 | 7.31 GB | 5.54 GB | 1303 |
+| `Qwen/Qwen2.5-7B-Instruct` | qlora | 1024 | 12.54 GB | 11.23 GB | 923 |
 
 ---
 

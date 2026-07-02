@@ -13,6 +13,56 @@ pre {padding: 0.5rem; overflow-x: auto;}
 <p></p>
 <p>Each section below corresponds to one benchmark result JSON. `estimated` is what the static estimator predicted, `measured` is what was observed on this machine.</p>
 <p></p>
+<h2>Qwen__Qwen2.5-0.5B-Instruct_lora_s1024_b1_r16_steps3.json  —  OK</h2>
+<p></p>
+<p>**Configuration**</p>
+<p></p>
+<p></p>
+<table><thead><tr>
+<th>Field</th>
+<th>Value</th>
+</tr></thead><tbody>
+<tr><td>model</td><td>`Qwen/Qwen2.5-0.5B-Instruct`</td></tr>
+<tr><td>method</td><td>lora</td></tr>
+<tr><td>seq_len</td><td>1024</td></tr>
+<tr><td>micro_batch_size</td><td>1</td></tr>
+<tr><td>steps</td><td>3</td></tr>
+<tr><td>lora_rank</td><td>16</td></tr>
+<tr><td>quantization</td><td>-</td></tr>
+<tr><td>optimizer</td><td>paged_adamw_8bit</td></tr>
+<tr><td>gradient_checkpointing</td><td>True</td></tr>
+<tr><td>attention</td><td>sdpa</td></tr>
+</tbody></table>
+<p></p>
+<p>**Environment**</p>
+<p></p>
+<p></p>
+<table><thead><tr>
+<th>Field</th>
+<th>Value</th>
+</tr></thead><tbody>
+<tr><td>GPU</td><td>NVIDIA GeForce RTX 4080 (15.99 GB)</td></tr>
+<tr><td>torch</td><td>2.6.0+cu124</td></tr>
+<tr><td>CUDA</td><td>12.4</td></tr>
+<tr><td>bf16</td><td>True</td></tr>
+</tbody></table>
+<p></p>
+<p>**Memory: estimated vs measured**</p>
+<p></p>
+<p></p>
+<table><thead><tr>
+<th>Metric</th>
+<th>Value</th>
+</tr></thead><tbody>
+<tr><td>estimated total</td><td>5.19 GB</td></tr>
+<tr><td>measured peak (reserved)</td><td>3.79 GB</td></tr>
+<tr><td>measured peak (allocated)</td><td>3.03 GB</td></tr>
+<tr><td>final allocated</td><td>1.25 GB</td></tr>
+<tr><td>tokens/sec</td><td>3761.51</td></tr>
+<tr><td>avg step time</td><td>0.2722 s</td></tr>
+<tr><td>last-step loss</td><td>13.0640</td></tr>
+</tbody></table>
+<p></p>
 <h2>Qwen__Qwen2.5-0.5B-Instruct_qlora_s1024_b1_r16_steps3.json  —  OK</h2>
 <p></p>
 <p>**Configuration**</p>
@@ -54,13 +104,63 @@ pre {padding: 0.5rem; overflow-x: auto;}
 <th>Metric</th>
 <th>Value</th>
 </tr></thead><tbody>
-<tr><td>estimated total</td><td>2.41 GB</td></tr>
+<tr><td>estimated total</td><td>5.01 GB</td></tr>
 <tr><td>measured peak (reserved)</td><td>3.30 GB</td></tr>
 <tr><td>measured peak (allocated)</td><td>3.12 GB</td></tr>
 <tr><td>final allocated</td><td>1.30 GB</td></tr>
-<tr><td>tokens/sec</td><td>1995.33</td></tr>
-<tr><td>avg step time</td><td>0.5132 s</td></tr>
-<tr><td>last-step loss</td><td>13.0308</td></tr>
+<tr><td>tokens/sec</td><td>3336.57</td></tr>
+<tr><td>avg step time</td><td>0.3069 s</td></tr>
+<tr><td>last-step loss</td><td>13.0227</td></tr>
+</tbody></table>
+<p></p>
+<h2>Qwen__Qwen2.5-0.5B-Instruct_qlora_s2048_b1_r16_steps3.json  —  OK</h2>
+<p></p>
+<p>**Configuration**</p>
+<p></p>
+<p></p>
+<table><thead><tr>
+<th>Field</th>
+<th>Value</th>
+</tr></thead><tbody>
+<tr><td>model</td><td>`Qwen/Qwen2.5-0.5B-Instruct`</td></tr>
+<tr><td>method</td><td>qlora</td></tr>
+<tr><td>seq_len</td><td>2048</td></tr>
+<tr><td>micro_batch_size</td><td>1</td></tr>
+<tr><td>steps</td><td>3</td></tr>
+<tr><td>lora_rank</td><td>16</td></tr>
+<tr><td>quantization</td><td>nf4_double_quant</td></tr>
+<tr><td>optimizer</td><td>paged_adamw_8bit</td></tr>
+<tr><td>gradient_checkpointing</td><td>True</td></tr>
+<tr><td>attention</td><td>sdpa</td></tr>
+</tbody></table>
+<p></p>
+<p>**Environment**</p>
+<p></p>
+<p></p>
+<table><thead><tr>
+<th>Field</th>
+<th>Value</th>
+</tr></thead><tbody>
+<tr><td>GPU</td><td>NVIDIA GeForce RTX 4080 (15.99 GB)</td></tr>
+<tr><td>torch</td><td>2.6.0+cu124</td></tr>
+<tr><td>CUDA</td><td>12.4</td></tr>
+<tr><td>bf16</td><td>True</td></tr>
+</tbody></table>
+<p></p>
+<p>**Memory: estimated vs measured**</p>
+<p></p>
+<p></p>
+<table><thead><tr>
+<th>Metric</th>
+<th>Value</th>
+</tr></thead><tbody>
+<tr><td>estimated total</td><td>7.22 GB</td></tr>
+<tr><td>measured peak (reserved)</td><td>6.28 GB</td></tr>
+<tr><td>measured peak (allocated)</td><td>5.52 GB</td></tr>
+<tr><td>final allocated</td><td>1.88 GB</td></tr>
+<tr><td>tokens/sec</td><td>3445.37</td></tr>
+<tr><td>avg step time</td><td>0.5944 s</td></tr>
+<tr><td>last-step loss</td><td>12.9314</td></tr>
 </tbody></table>
 <p></p>
 <h2>Qwen__Qwen2.5-1.5B-Instruct_qlora_s1024_b1_r16_steps3.json  —  OK</h2>
@@ -104,13 +204,113 @@ pre {padding: 0.5rem; overflow-x: auto;}
 <th>Metric</th>
 <th>Value</th>
 </tr></thead><tbody>
-<tr><td>estimated total</td><td>3.00 GB</td></tr>
+<tr><td>estimated total</td><td>6.07 GB</td></tr>
 <tr><td>measured peak (reserved)</td><td>4.36 GB</td></tr>
 <tr><td>measured peak (allocated)</td><td>4.04 GB</td></tr>
 <tr><td>final allocated</td><td>2.14 GB</td></tr>
-<tr><td>tokens/sec</td><td>1351.69</td></tr>
-<tr><td>avg step time</td><td>0.7576 s</td></tr>
-<tr><td>last-step loss</td><td>13.0922</td></tr>
+<tr><td>tokens/sec</td><td>2482.60</td></tr>
+<tr><td>avg step time</td><td>0.4125 s</td></tr>
+<tr><td>last-step loss</td><td>13.0873</td></tr>
+</tbody></table>
+<p></p>
+<h2>Qwen__Qwen2.5-1.5B-Instruct_qlora_s1024_b1_r16_steps3_nockpt.json  —  OK</h2>
+<p></p>
+<p>**Configuration**</p>
+<p></p>
+<p></p>
+<table><thead><tr>
+<th>Field</th>
+<th>Value</th>
+</tr></thead><tbody>
+<tr><td>model</td><td>`Qwen/Qwen2.5-1.5B-Instruct`</td></tr>
+<tr><td>method</td><td>qlora</td></tr>
+<tr><td>seq_len</td><td>1024</td></tr>
+<tr><td>micro_batch_size</td><td>1</td></tr>
+<tr><td>steps</td><td>3</td></tr>
+<tr><td>lora_rank</td><td>16</td></tr>
+<tr><td>quantization</td><td>nf4_double_quant</td></tr>
+<tr><td>optimizer</td><td>paged_adamw_8bit</td></tr>
+<tr><td>gradient_checkpointing</td><td>False</td></tr>
+<tr><td>attention</td><td>sdpa</td></tr>
+</tbody></table>
+<p></p>
+<p>**Environment**</p>
+<p></p>
+<p></p>
+<table><thead><tr>
+<th>Field</th>
+<th>Value</th>
+</tr></thead><tbody>
+<tr><td>GPU</td><td>NVIDIA GeForce RTX 4080 (15.99 GB)</td></tr>
+<tr><td>torch</td><td>2.6.0+cu124</td></tr>
+<tr><td>CUDA</td><td>12.4</td></tr>
+<tr><td>bf16</td><td>True</td></tr>
+</tbody></table>
+<p></p>
+<p>**Memory: estimated vs measured**</p>
+<p></p>
+<p></p>
+<table><thead><tr>
+<th>Metric</th>
+<th>Value</th>
+</tr></thead><tbody>
+<tr><td>estimated total</td><td>10.77 GB</td></tr>
+<tr><td>measured peak (reserved)</td><td>9.55 GB</td></tr>
+<tr><td>measured peak (allocated)</td><td>9.34 GB</td></tr>
+<tr><td>final allocated</td><td>2.18 GB</td></tr>
+<tr><td>tokens/sec</td><td>3002.86</td></tr>
+<tr><td>avg step time</td><td>0.3410 s</td></tr>
+<tr><td>last-step loss</td><td>13.0907</td></tr>
+</tbody></table>
+<p></p>
+<h2>Qwen__Qwen2.5-1.5B-Instruct_qlora_s1024_b2_r16_steps2.json  —  OK</h2>
+<p></p>
+<p>**Configuration**</p>
+<p></p>
+<p></p>
+<table><thead><tr>
+<th>Field</th>
+<th>Value</th>
+</tr></thead><tbody>
+<tr><td>model</td><td>`Qwen/Qwen2.5-1.5B-Instruct`</td></tr>
+<tr><td>method</td><td>qlora</td></tr>
+<tr><td>seq_len</td><td>1024</td></tr>
+<tr><td>micro_batch_size</td><td>2</td></tr>
+<tr><td>steps</td><td>2</td></tr>
+<tr><td>lora_rank</td><td>16</td></tr>
+<tr><td>quantization</td><td>nf4_double_quant</td></tr>
+<tr><td>optimizer</td><td>paged_adamw_8bit</td></tr>
+<tr><td>gradient_checkpointing</td><td>True</td></tr>
+<tr><td>attention</td><td>sdpa</td></tr>
+</tbody></table>
+<p></p>
+<p>**Environment**</p>
+<p></p>
+<p></p>
+<table><thead><tr>
+<th>Field</th>
+<th>Value</th>
+</tr></thead><tbody>
+<tr><td>GPU</td><td>NVIDIA GeForce RTX 4080 (15.99 GB)</td></tr>
+<tr><td>torch</td><td>2.6.0+cu124</td></tr>
+<tr><td>CUDA</td><td>12.4</td></tr>
+<tr><td>bf16</td><td>True</td></tr>
+</tbody></table>
+<p></p>
+<p>**Memory: estimated vs measured**</p>
+<p></p>
+<p></p>
+<table><thead><tr>
+<th>Metric</th>
+<th>Value</th>
+</tr></thead><tbody>
+<tr><td>estimated total</td><td>8.44 GB</td></tr>
+<tr><td>measured peak (reserved)</td><td>6.88 GB</td></tr>
+<tr><td>measured peak (allocated)</td><td>6.53 GB</td></tr>
+<tr><td>final allocated</td><td>2.73 GB</td></tr>
+<tr><td>tokens/sec</td><td>2661.52</td></tr>
+<tr><td>avg step time</td><td>0.7695 s</td></tr>
+<tr><td>last-step loss</td><td>13.3183</td></tr>
 </tbody></table>
 <p></p>
 <h2>Qwen__Qwen2.5-1.5B-Instruct_qlora_s2048_b1_r16_steps3.json  —  OK</h2>
@@ -154,13 +354,113 @@ pre {padding: 0.5rem; overflow-x: auto;}
 <th>Metric</th>
 <th>Value</th>
 </tr></thead><tbody>
-<tr><td>estimated total</td><td>3.16 GB</td></tr>
+<tr><td>estimated total</td><td>8.44 GB</td></tr>
 <tr><td>measured peak (reserved)</td><td>7.10 GB</td></tr>
 <tr><td>measured peak (allocated)</td><td>6.53 GB</td></tr>
 <tr><td>final allocated</td><td>2.74 GB</td></tr>
-<tr><td>tokens/sec</td><td>1470.40</td></tr>
-<tr><td>avg step time</td><td>1.3928 s</td></tr>
-<tr><td>last-step loss</td><td>13.0132</td></tr>
+<tr><td>tokens/sec</td><td>2326.95</td></tr>
+<tr><td>avg step time</td><td>0.8801 s</td></tr>
+<tr><td>last-step loss</td><td>13.0152</td></tr>
+</tbody></table>
+<p></p>
+<h2>Qwen__Qwen2.5-1.5B-Instruct_qlora_s4096_b1_r16_steps2.json  —  OK</h2>
+<p></p>
+<p>**Configuration**</p>
+<p></p>
+<p></p>
+<table><thead><tr>
+<th>Field</th>
+<th>Value</th>
+</tr></thead><tbody>
+<tr><td>model</td><td>`Qwen/Qwen2.5-1.5B-Instruct`</td></tr>
+<tr><td>method</td><td>qlora</td></tr>
+<tr><td>seq_len</td><td>4096</td></tr>
+<tr><td>micro_batch_size</td><td>1</td></tr>
+<tr><td>steps</td><td>2</td></tr>
+<tr><td>lora_rank</td><td>16</td></tr>
+<tr><td>quantization</td><td>nf4_double_quant</td></tr>
+<tr><td>optimizer</td><td>paged_adamw_8bit</td></tr>
+<tr><td>gradient_checkpointing</td><td>True</td></tr>
+<tr><td>attention</td><td>sdpa</td></tr>
+</tbody></table>
+<p></p>
+<p>**Environment**</p>
+<p></p>
+<p></p>
+<table><thead><tr>
+<th>Field</th>
+<th>Value</th>
+</tr></thead><tbody>
+<tr><td>GPU</td><td>NVIDIA GeForce RTX 4080 (15.99 GB)</td></tr>
+<tr><td>torch</td><td>2.6.0+cu124</td></tr>
+<tr><td>CUDA</td><td>12.4</td></tr>
+<tr><td>bf16</td><td>True</td></tr>
+</tbody></table>
+<p></p>
+<p>**Memory: estimated vs measured**</p>
+<p></p>
+<p></p>
+<table><thead><tr>
+<th>Metric</th>
+<th>Value</th>
+</tr></thead><tbody>
+<tr><td>estimated total</td><td>13.19 GB</td></tr>
+<tr><td>measured peak (reserved)</td><td>13.56 GB</td></tr>
+<tr><td>measured peak (allocated)</td><td>11.51 GB</td></tr>
+<tr><td>final allocated</td><td>3.92 GB</td></tr>
+<tr><td>tokens/sec</td><td>1661.93</td></tr>
+<tr><td>avg step time</td><td>2.4646 s</td></tr>
+<tr><td>last-step loss</td><td>13.1373</td></tr>
+</tbody></table>
+<p></p>
+<h2>Qwen__Qwen2.5-1.5B-Instruct_qlora_s512_b1_r16_steps3.json  —  OK</h2>
+<p></p>
+<p>**Configuration**</p>
+<p></p>
+<p></p>
+<table><thead><tr>
+<th>Field</th>
+<th>Value</th>
+</tr></thead><tbody>
+<tr><td>model</td><td>`Qwen/Qwen2.5-1.5B-Instruct`</td></tr>
+<tr><td>method</td><td>qlora</td></tr>
+<tr><td>seq_len</td><td>512</td></tr>
+<tr><td>micro_batch_size</td><td>1</td></tr>
+<tr><td>steps</td><td>3</td></tr>
+<tr><td>lora_rank</td><td>16</td></tr>
+<tr><td>quantization</td><td>nf4_double_quant</td></tr>
+<tr><td>optimizer</td><td>paged_adamw_8bit</td></tr>
+<tr><td>gradient_checkpointing</td><td>True</td></tr>
+<tr><td>attention</td><td>sdpa</td></tr>
+</tbody></table>
+<p></p>
+<p>**Environment**</p>
+<p></p>
+<p></p>
+<table><thead><tr>
+<th>Field</th>
+<th>Value</th>
+</tr></thead><tbody>
+<tr><td>GPU</td><td>NVIDIA GeForce RTX 4080 (15.99 GB)</td></tr>
+<tr><td>torch</td><td>2.6.0+cu124</td></tr>
+<tr><td>CUDA</td><td>12.4</td></tr>
+<tr><td>bf16</td><td>True</td></tr>
+</tbody></table>
+<p></p>
+<p>**Memory: estimated vs measured**</p>
+<p></p>
+<p></p>
+<table><thead><tr>
+<th>Metric</th>
+<th>Value</th>
+</tr></thead><tbody>
+<tr><td>estimated total</td><td>4.88 GB</td></tr>
+<tr><td>measured peak (reserved)</td><td>2.91 GB</td></tr>
+<tr><td>measured peak (allocated)</td><td>2.79 GB</td></tr>
+<tr><td>final allocated</td><td>1.85 GB</td></tr>
+<tr><td>tokens/sec</td><td>1497.69</td></tr>
+<tr><td>avg step time</td><td>0.3419 s</td></tr>
+<tr><td>last-step loss</td><td>13.2013</td></tr>
 </tbody></table>
 <p></p>
 <h2>Qwen__Qwen2.5-3B-Instruct_qlora_s1024_b1_r16_steps2.json  —  OK</h2>
@@ -204,16 +504,16 @@ pre {padding: 0.5rem; overflow-x: auto;}
 <th>Metric</th>
 <th>Value</th>
 </tr></thead><tbody>
-<tr><td>estimated total</td><td>3.86 GB</td></tr>
+<tr><td>estimated total</td><td>7.31 GB</td></tr>
 <tr><td>measured peak (reserved)</td><td>5.54 GB</td></tr>
 <tr><td>measured peak (allocated)</td><td>5.17 GB</td></tr>
 <tr><td>final allocated</td><td>3.16 GB</td></tr>
-<tr><td>tokens/sec</td><td>1158.51</td></tr>
-<tr><td>avg step time</td><td>0.8839 s</td></tr>
-<tr><td>last-step loss</td><td>13.5622</td></tr>
+<tr><td>tokens/sec</td><td>1302.90</td></tr>
+<tr><td>avg step time</td><td>0.7859 s</td></tr>
+<tr><td>last-step loss</td><td>13.5585</td></tr>
 </tbody></table>
 <p></p>
-<h2>sshleifer__tiny-gpt2_lora_s128_b1_r8_steps3.json  —  OK</h2>
+<h2>Qwen__Qwen2.5-7B-Instruct_qlora_s1024_b1_r16_steps2.json  —  OK</h2>
 <p></p>
 <p>**Configuration**</p>
 <p></p>
@@ -222,16 +522,16 @@ pre {padding: 0.5rem; overflow-x: auto;}
 <th>Field</th>
 <th>Value</th>
 </tr></thead><tbody>
-<tr><td>model</td><td>`sshleifer/tiny-gpt2`</td></tr>
-<tr><td>method</td><td>lora</td></tr>
-<tr><td>seq_len</td><td>128</td></tr>
+<tr><td>model</td><td>`Qwen/Qwen2.5-7B-Instruct`</td></tr>
+<tr><td>method</td><td>qlora</td></tr>
+<tr><td>seq_len</td><td>1024</td></tr>
 <tr><td>micro_batch_size</td><td>1</td></tr>
-<tr><td>steps</td><td>3</td></tr>
-<tr><td>lora_rank</td><td>8</td></tr>
-<tr><td>quantization</td><td>bf16</td></tr>
-<tr><td>optimizer</td><td>adamw_torch</td></tr>
-<tr><td>gradient_checkpointing</td><td>False</td></tr>
-<tr><td>attention</td><td>eager</td></tr>
+<tr><td>steps</td><td>2</td></tr>
+<tr><td>lora_rank</td><td>16</td></tr>
+<tr><td>quantization</td><td>nf4_double_quant</td></tr>
+<tr><td>optimizer</td><td>paged_adamw_8bit</td></tr>
+<tr><td>gradient_checkpointing</td><td>True</td></tr>
+<tr><td>attention</td><td>sdpa</td></tr>
 </tbody></table>
 <p></p>
 <p>**Environment**</p>
@@ -254,12 +554,62 @@ pre {padding: 0.5rem; overflow-x: auto;}
 <th>Metric</th>
 <th>Value</th>
 </tr></thead><tbody>
-<tr><td>estimated total</td><td>2.08 GB</td></tr>
-<tr><td>measured peak (reserved)</td><td>0.12 GB</td></tr>
-<tr><td>measured peak (allocated)</td><td>0.11 GB</td></tr>
-<tr><td>final allocated</td><td>0.04 GB</td></tr>
-<tr><td>tokens/sec</td><td>1735.45</td></tr>
-<tr><td>avg step time</td><td>0.0738 s</td></tr>
-<tr><td>last-step loss</td><td>10.8217</td></tr>
+<tr><td>estimated total</td><td>12.54 GB</td></tr>
+<tr><td>measured peak (reserved)</td><td>11.23 GB</td></tr>
+<tr><td>measured peak (allocated)</td><td>10.00 GB</td></tr>
+<tr><td>final allocated</td><td>7.89 GB</td></tr>
+<tr><td>tokens/sec</td><td>922.90</td></tr>
+<tr><td>avg step time</td><td>1.1095 s</td></tr>
+<tr><td>last-step loss</td><td>13.6009</td></tr>
+</tbody></table>
+<p></p>
+<h2>sshleifer__tiny-gpt2_lora_s128_b1_r8_steps3.json  —  OK</h2>
+<p></p>
+<p>**Configuration**</p>
+<p></p>
+<p></p>
+<table><thead><tr>
+<th>Field</th>
+<th>Value</th>
+</tr></thead><tbody>
+<tr><td>model</td><td>`sshleifer/tiny-gpt2`</td></tr>
+<tr><td>method</td><td>lora</td></tr>
+<tr><td>seq_len</td><td>128</td></tr>
+<tr><td>micro_batch_size</td><td>1</td></tr>
+<tr><td>steps</td><td>3</td></tr>
+<tr><td>lora_rank</td><td>8</td></tr>
+<tr><td>quantization</td><td>-</td></tr>
+<tr><td>optimizer</td><td>paged_adamw_8bit</td></tr>
+<tr><td>gradient_checkpointing</td><td>True</td></tr>
+<tr><td>attention</td><td>sdpa</td></tr>
+</tbody></table>
+<p></p>
+<p>**Environment**</p>
+<p></p>
+<p></p>
+<table><thead><tr>
+<th>Field</th>
+<th>Value</th>
+</tr></thead><tbody>
+<tr><td>GPU</td><td>NVIDIA GeForce RTX 4080 (15.99 GB)</td></tr>
+<tr><td>torch</td><td>2.6.0+cu124</td></tr>
+<tr><td>CUDA</td><td>12.4</td></tr>
+<tr><td>bf16</td><td>True</td></tr>
+</tbody></table>
+<p></p>
+<p>**Memory: estimated vs measured**</p>
+<p></p>
+<p></p>
+<table><thead><tr>
+<th>Metric</th>
+<th>Value</th>
+</tr></thead><tbody>
+<tr><td>estimated total</td><td>2.16 GB</td></tr>
+<tr><td>measured peak (reserved)</td><td>0.14 GB</td></tr>
+<tr><td>measured peak (allocated)</td><td>0.10 GB</td></tr>
+<tr><td>final allocated</td><td>0.03 GB</td></tr>
+<tr><td>tokens/sec</td><td>1470.37</td></tr>
+<tr><td>avg step time</td><td>0.0871 s</td></tr>
+<tr><td>last-step loss</td><td>10.8219</td></tr>
 </tbody></table>
 </body></html>

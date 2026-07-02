@@ -16,41 +16,64 @@ not run — we do not interpolate.
 | OS | Windows 11 |
 | Notes | Display was attached to the same GPU; ~1 GB of VRAM was held by the desktop / browser at the start of each run. |
 
-## Smoke + 0.5B / 1.5B / 3B QLoRA results
+## Results: estimated vs measured
 
-Each row is one `canifinetune bench` invocation. Both `estimated GB` and
-`measured peak (reserved) GB` are reported so the gap is visible — that is
-exactly the gap that `canifinetune calibrate` consumes.
+Each row is one `canifinetune bench` invocation (rank 16, `attention` scope,
+`paged_adamw_8bit`, `nf4_double_quant` for QLoRA). `est. GB` is the *static*
+estimate produced by the same code that ships in this repo — including its
+CUDA-overhead and safety-margin headroom — and `measured` is the
+`torch.cuda.max_memory_reserved` peak of the real run. The estimate is meant
+to sit slightly *above* the measured peak.
 
-| model | method | seq_len | batch | rank | quant | ckpt | optimizer | est. GB | **measured peak (reserved) GB** | tok/sec | step time (s) | OOM |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `sshleifer/tiny-gpt2` | lora | 128 | 1 | 8 | bf16 | off | adamw_torch | 2.08 | **0.12** | 1735 | 0.07 | no |
-| `Qwen/Qwen2.5-0.5B-Instruct` | qlora | 1024 | 1 | 16 | nf4_double_quant | on | paged_adamw_8bit | 2.41 | **3.30** | 1995 | 0.51 | no |
-| `Qwen/Qwen2.5-1.5B-Instruct` | qlora | 1024 | 1 | 16 | nf4_double_quant | on | paged_adamw_8bit | 3.00 | **4.36** | 1352 | 0.76 | no |
-| `Qwen/Qwen2.5-1.5B-Instruct` | qlora | 2048 | 1 | 16 | nf4_double_quant | on | paged_adamw_8bit | 3.16 | **7.10** | 1470 | 1.39 | no |
-| `Qwen/Qwen2.5-3B-Instruct` | qlora | 1024 | 1 | 16 | nf4_double_quant | on | paged_adamw_8bit | 3.86 | **5.54** | 1158 | 0.88 | no |
+| model | method | seq_len | batch | ckpt | est. GB | **measured peak (reserved) GB** | tok/sec | OOM |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `Qwen/Qwen2.5-0.5B-Instruct` | qlora | 1024 | 1 | on | 5.01 | **3.30** | 3337 | no |
+| `Qwen/Qwen2.5-0.5B-Instruct` | qlora | 2048 | 1 | on | 7.22 | **6.28** | 3445 | no |
+| `Qwen/Qwen2.5-0.5B-Instruct` | lora (bf16) | 1024 | 1 | on | 5.19 | **3.79** | 3762 | no |
+| `Qwen/Qwen2.5-1.5B-Instruct` | qlora | 512 | 1 | on | 4.88 | **2.91** | 1498 | no |
+| `Qwen/Qwen2.5-1.5B-Instruct` | qlora | 1024 | 1 | on | 6.07 | **4.36** | 2483 | no |
+| `Qwen/Qwen2.5-1.5B-Instruct` | qlora | 2048 | 1 | on | 8.44 | **7.10** | 2327 | no |
+| `Qwen/Qwen2.5-1.5B-Instruct` | qlora | 4096 | 1 | on | 13.19 | **13.56** | 1662 | no |
+| `Qwen/Qwen2.5-1.5B-Instruct` | qlora | 1024 | 2 | on | 8.44 | **6.88** | 2662 | no |
+| `Qwen/Qwen2.5-1.5B-Instruct` | qlora | 1024 | 1 | **off** | 10.77 | **9.55** | 3003 | no |
+| `Qwen/Qwen2.5-3B-Instruct` | qlora | 1024 | 1 | on | 7.31 | **5.54** | 1303 | no |
+| `Qwen/Qwen2.5-7B-Instruct` | qlora | 1024 | 1 | on | 12.54 | **11.23** | 923 | no |
+| `sshleifer/tiny-gpt2` (smoke) | lora | 128 | 1 | on | 2.16 | **0.14** | 1470 | no |
 
-The 1.5B model fits comfortably at seq=2048 with QLoRA on a 16 GB consumer
-card — even with a desktop / browser eating ~1 GB at runtime. The 3B model
-likewise fits at seq=1024.
+Comparing the estimator's *real components* (total minus the headroom terms)
+against `max_memory_allocated` instead, every non-smoke row lands within
+**0.93–1.05×** of the measurement — that band is enforced by
+`tests/test_estimator_accuracy.py`, which pins these exact runs as regression
+fixtures. (The tiny-gpt2 smoke row is all fixed headroom by construction.)
+
+Worth reading off the table directly:
+
+- **seq_len slope is real and linear**: 2.91 → 4.36 → 7.10 → 13.56 GB for
+  512 → 1024 → 2048 → 4096. Almost all of that increment is the
+  logits/cross-entropy chain (vocab 151,936), which gradient checkpointing
+  cannot remove.
+- **batch 2 × seq 1024 ≈ batch 1 × seq 2048** (6.88 vs 7.10 GB) — dynamic
+  memory scales with `batch × seq`.
+- **Checkpointing off costs +5.2 GB** at 1.5B/seq 1024 (4.36 → 9.55 GB) and
+  buys ~20% throughput. On a 16 GB card it is usually the wrong trade above
+  seq 1024.
+- **7B QLoRA fits a 16 GB card at seq 1024** (11.23 GB measured) but does
+  *not* fit a 12 GB card — and the estimator now says exactly that (12.54
+  estimated → `no` at 12 GB, `yes` at 16 GB).
 
 ## Calibration
 
 Running `canifinetune calibrate --benchmarks benchmarks/results` on the
-results above produces a single multiplicative correction. The mean
-measured/estimated ratio across the five runs is **1.31×**. That is the
-factor `canifinetune estimate --use-calibration` applies to the
-weights / activations / CUDA-overhead components.
+results above fits a single multiplicative correction from 11 samples
+(smoke-scale runs are excluded automatically). The mean measured/estimated
+ratio is **0.80×** — i.e. the static estimate with its headroom sits ~20%
+above the reserved-memory peak on this machine, on the conservative side.
+Applying `--use-calibration` tightens estimates toward measured reality;
+leaving it off keeps the extra guard band.
 
-The biggest residual gap is at `seq_len=2048`: 7.10 GB measured vs.
-~3.16 GB statically estimated (ratio 2.25×). This is in line with what the
-[memory model docs](memory_model.md) warn about — the static activation
-formula under-predicts when bitsandbytes 4-bit unpacking buffers
-materialize bf16 copies of weight blocks during each forward step.
-
-The `canifinetune` philosophy is to surface this gap, not paper over it:
-the static estimate is *fast and conservative*, the benchmark is *slow and
-real*, and calibration closes the loop on the operator's machine.
+The static estimator alone was 0.5–3.9× off (both directions) before the
+logits-chain and fp32-upcast terms were added in 0.2.0; calibration existed
+to paper over that. It no longer has to — it is now a per-machine fine-trim.
 
 ## Reproducing
 

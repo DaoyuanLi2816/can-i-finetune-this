@@ -5,11 +5,11 @@
       "torch_version": "2.6.0+cu124",
       "cuda_version": "12.4",
       "model_family": "qwen2",
-      "method": "qlora",
+      "method": "lora",
       "seq_len": 1024,
       "micro_batch_size": 1,
-      "estimated_total_gb": 2.4059,
-      "measured_total_gb": 3.3027
+      "estimated_total_gb": 5.188,
+      "measured_total_gb": 3.7949
     },
     {
       "gpu_name": "NVIDIA GeForce RTX 4080",
@@ -19,8 +19,8 @@
       "method": "qlora",
       "seq_len": 1024,
       "micro_batch_size": 1,
-      "estimated_total_gb": 2.9981,
-      "measured_total_gb": 4.3574
+      "estimated_total_gb": 5.0111,
+      "measured_total_gb": 3.3027
     },
     {
       "gpu_name": "NVIDIA GeForce RTX 4080",
@@ -30,8 +30,8 @@
       "method": "qlora",
       "seq_len": 2048,
       "micro_batch_size": 1,
-      "estimated_total_gb": 3.1622,
-      "measured_total_gb": 7.0977
+      "estimated_total_gb": 7.2206,
+      "measured_total_gb": 6.2812
     },
     {
       "gpu_name": "NVIDIA GeForce RTX 4080",
@@ -41,23 +41,89 @@
       "method": "qlora",
       "seq_len": 1024,
       "micro_batch_size": 1,
-      "estimated_total_gb": 3.864,
+      "estimated_total_gb": 6.067,
+      "measured_total_gb": 4.3574
+    },
+    {
+      "gpu_name": "NVIDIA GeForce RTX 4080",
+      "torch_version": "2.6.0+cu124",
+      "cuda_version": "12.4",
+      "model_family": "qwen2",
+      "method": "qlora",
+      "seq_len": 1024,
+      "micro_batch_size": 1,
+      "estimated_total_gb": 10.7677,
+      "measured_total_gb": 9.5527
+    },
+    {
+      "gpu_name": "NVIDIA GeForce RTX 4080",
+      "torch_version": "2.6.0+cu124",
+      "cuda_version": "12.4",
+      "model_family": "qwen2",
+      "method": "qlora",
+      "seq_len": 1024,
+      "micro_batch_size": 2,
+      "estimated_total_gb": 8.4398,
+      "measured_total_gb": 6.8809
+    },
+    {
+      "gpu_name": "NVIDIA GeForce RTX 4080",
+      "torch_version": "2.6.0+cu124",
+      "cuda_version": "12.4",
+      "model_family": "qwen2",
+      "method": "qlora",
+      "seq_len": 2048,
+      "micro_batch_size": 1,
+      "estimated_total_gb": 8.4398,
+      "measured_total_gb": 7.0977
+    },
+    {
+      "gpu_name": "NVIDIA GeForce RTX 4080",
+      "torch_version": "2.6.0+cu124",
+      "cuda_version": "12.4",
+      "model_family": "qwen2",
+      "method": "qlora",
+      "seq_len": 4096,
+      "micro_batch_size": 1,
+      "estimated_total_gb": 13.1854,
+      "measured_total_gb": 13.5566
+    },
+    {
+      "gpu_name": "NVIDIA GeForce RTX 4080",
+      "torch_version": "2.6.0+cu124",
+      "cuda_version": "12.4",
+      "model_family": "qwen2",
+      "method": "qlora",
+      "seq_len": 512,
+      "micro_batch_size": 1,
+      "estimated_total_gb": 4.8806,
+      "measured_total_gb": 2.9062
+    },
+    {
+      "gpu_name": "NVIDIA GeForce RTX 4080",
+      "torch_version": "2.6.0+cu124",
+      "cuda_version": "12.4",
+      "model_family": "qwen2",
+      "method": "qlora",
+      "seq_len": 1024,
+      "micro_batch_size": 1,
+      "estimated_total_gb": 7.3086,
       "measured_total_gb": 5.5371
     },
     {
       "gpu_name": "NVIDIA GeForce RTX 4080",
       "torch_version": "2.6.0+cu124",
       "cuda_version": "12.4",
-      "model_family": "gpt2",
-      "method": "lora",
-      "seq_len": 128,
+      "model_family": "qwen2",
+      "method": "qlora",
+      "seq_len": 1024,
       "micro_batch_size": 1,
-      "estimated_total_gb": 2.08,
-      "measured_total_gb": 0.125
+      "estimated_total_gb": 12.537,
+      "measured_total_gb": 11.2324
     }
   ],
-  "activation_scale": 1.3127550905283907,
-  "weights_scale": 1.3127550905283907,
-  "overhead_scale": 1.3127550905283907,
-  "note": "Fit from 5 sample(s); mean measured/estimated ratio = 1.313. Applied uniformly to weights + activations + CUDA overhead; safety_margin left untouched."
+  "activation_scale": 0.7999333540723071,
+  "weights_scale": 0.7999333540723071,
+  "overhead_scale": 0.7999333540723071,
+  "note": "Fit from 11 sample(s); mean measured/estimated ratio = 0.800. Applied uniformly to weights + activations + CUDA overhead; safety_margin left untouched."
 }
