@@ -65,7 +65,8 @@ def _render_one_result(path: Path, data: dict[str, Any]) -> str:
     out.append(f"| micro_batch_size | {cfg.get('micro_batch_size', '?')} |")
     out.append(f"| steps | {cfg.get('steps', '?')} |")
     out.append(f"| lora_rank | {cfg.get('lora_rank', '?')} |")
-    out.append(f"| quantization | {cfg.get('quantization', '?')} |")
+    quant = cfg.get("quantization", "?") if cfg.get("method") == "qlora" else "-"
+    out.append(f"| quantization | {quant} |")
     out.append(f"| optimizer | {cfg.get('optimizer', '?')} |")
     out.append(f"| gradient_checkpointing | {cfg.get('gradient_checkpointing', '?')} |")
     out.append(f"| attention | {cfg.get('attention_implementation', '?')} |")
@@ -144,7 +145,7 @@ def render_compare_markdown(result_paths: Iterable[Path]) -> str:
                 str(cfg.get("seq_len", "?")),
                 str(cfg.get("micro_batch_size", "?")),
                 str(cfg.get("lora_rank", "?")),
-                cfg.get("quantization", "?"),
+                cfg.get("quantization", "?") if cfg.get("method") == "qlora" else "-",
                 "on" if cfg.get("gradient_checkpointing") else "off",
                 cfg.get("optimizer", "?"),
                 _fmt_num(measured.get("peak_reserved_gb")),
