@@ -445,6 +445,16 @@ def result_path_for(
         f"{safe_model}_{cfg.method}_s{cfg.seq_len}_b{cfg.micro_batch_size}"
         f"_r{cfg.lora_rank}_steps{cfg.steps}"
     )
+    # Distinguish runs that differ only in checkpointing / quant / scope so
+    # A/B comparisons don't overwrite each other. Defaults stay short.
+    if not cfg.gradient_checkpointing:
+        name += "_nockpt"
+    if cfg.method == "qlora" and cfg.quantization != "nf4_double_quant":
+        name += f"_{cfg.quantization}"
+    if cfg.lora_target_scope != "attention":
+        name += f"_{cfg.lora_target_scope}"
+    if cfg.forward_only:
+        name += "_fwdonly"
     if suffix:
         name = f"{name}_{suffix}"
     return base / f"{name}.json"
