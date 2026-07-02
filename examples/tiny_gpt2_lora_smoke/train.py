@@ -88,7 +88,12 @@ def _format_example(tokenizer, instruction: str, input_text: str, output: str, m
         prompt = f"### Instruction:\n{instruction}\n\n### Response:\n"
     text = prompt + output + tokenizer.eos_token
     enc = tokenizer(text, truncation=True, max_length=max_len, padding="max_length")
-    enc["labels"] = list(enc["input_ids"])
+    # Mask padding out of the loss. Use attention_mask (not pad_token_id) so a
+    # genuine EOS inside the content survives when pad_token == eos_token.
+    enc["labels"] = [
+        (tok if mask == 1 else -100)
+        for tok, mask in zip(enc["input_ids"], enc["attention_mask"])
+    ]
     return enc
 
 
@@ -285,13 +290,16 @@ def main() -> int:
                 packing=False,
             )
     else:
-        from transformers import DataCollatorForLanguageModeling, Trainer
-        collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)
+        # Rows are already tokenized, padded, and label-masked by
+        # _format_example; default_data_collator just stacks them (a
+        # DataCollatorForLanguageModeling would rebuild labels and re-mask
+        # every eos when pad_token == eos_token).
+        from transformers import Trainer, default_data_collator
         trainer = Trainer(
             model=model,
             args=train_args,
             train_dataset=train_ds,
-            data_collator=collator,
+            data_collator=default_data_collator,
         )
 
     try:

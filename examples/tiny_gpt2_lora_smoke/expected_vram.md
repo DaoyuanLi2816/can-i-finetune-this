@@ -31,9 +31,10 @@ Numbers are **predictions**, not measurements. Real VRAM may differ; run
 | gradients | 0.000 |
 | optimizer states | 0.000 |
 | activations | 0.001 |
+| logits / loss chain | 0.084 |
 | CUDA / fragmentation overhead | 1.280 |
 | safety margin | 0.800 |
-| **total estimated** | **2.081** |
+| **total estimated** | **2.165** |
 
 Feasibility on a 16.0 GB GPU: **yes**
 (confidence: medium).

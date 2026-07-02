@@ -25,15 +25,16 @@ Numbers are **predictions**, not measurements. Real VRAM may differ; run
 
 | Component | GB |
 | --- | --- |
-| static weights | 0.737 |
-| quantization overhead | 0.018 |
+| static weights | 1.517 |
+| quantization overhead | 0.072 |
 | trainable parameters | 4.4 MB |
-| gradients | 0.008 |
+| gradients | 0.016 |
 | optimizer states | 0.010 |
-| activations | 0.164 |
+| activations | 0.344 |
+| logits / loss chain | 2.029 |
 | CUDA / fragmentation overhead | 1.280 |
 | safety margin | 0.800 |
-| **total estimated** | **2.999** |
+| **total estimated** | **6.068** |
 
 Feasibility on a 16.0 GB GPU: **yes**
 (confidence: medium).
