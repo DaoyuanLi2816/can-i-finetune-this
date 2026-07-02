@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "canifinetune"
-version = "0.1.1"
+version = "0.2.0"
 description = "Estimate, benchmark, and generate fine-tuning recipes for LLMs on consumer GPUs."
 readme = "README.md"
 requires-python = ">=3.10"
