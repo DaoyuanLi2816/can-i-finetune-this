@@ -6,14 +6,25 @@ exercise this module directly so the heuristics are reproducible.
 References:
   * Megatron-LM activation-memory equations, "Reducing Activation Recomputation
     in Large Transformer Models" (Korthikanti et al., 2022). Used as the
-    skeleton of the per-layer activation formula.
+    skeleton of the per-layer activation formula, with coefficients re-fitted
+    against real ``torch.cuda.max_memory_allocated()`` traces (see below).
   * Hugging Face transformers + PEFT default LoRA target modules per
     architecture family.
   * bitsandbytes documentation for NF4 block size and double-quantization
     overhead.
+  * PEFT ``prepare_model_for_kbit_training``, which upcasts every
+    non-quantized parameter (embeddings, lm_head, norms) to fp32. Measured:
+    Qwen2.5-1.5B loads at 1.51 GiB after prepare (0.61 GiB packed 4-bit +
+    0.87 GiB fp32 tied embedding), Qwen2.5-7B at 7.2 GiB (3.04 GiB packed +
+    2 x 2.03 GiB fp32 untied embedding/lm_head).
 
-The formulas below intentionally err slightly toward over-estimation so the
-"feasible" verdict is conservative on consumer cards.
+Coefficients were calibrated against measured peaks on an RTX 4080 (16 GB,
+torch 2.6 / transformers 5.8 / peft 0.19 / bitsandbytes 0.49) across
+Qwen2.5-0.5B/1.5B/3B/7B, seq_len 512-4096, batch 1-2, ckpt on/off, LoRA and
+QLoRA. The static component of each estimate lands within about +-10% of
+``max_memory_allocated`` on those runs; the formulas intentionally err
+slightly toward over-estimation so the "feasible" verdict is conservative
+on consumer cards.
 """
 
 from __future__ import annotations
@@ -33,28 +44,60 @@ class ArchHints:
     num_key_value_heads: int
     intermediate_size: int
     vocab_size: int
+    # Whether lm_head shares storage with the input embedding. Untied models
+    # (Llama 3, Mistral, Qwen2.5-7B, ...) pay for the embedding matrix twice.
+    tie_word_embeddings: bool = True
+
+
+# Families whose MLP is a classic 2-matmul block (fc1 -> act -> fc2) rather
+# than the 3-matmul SwiGLU (gate/up/down) used by llama-likes.
+CLASSIC_MLP_FAMILIES = {"gpt2", "phi", "opt", "bloom", "gpt_neox", "falcon"}
+
+
+def _is_swiglu(family: str) -> bool:
+    return (family or "").lower() not in CLASSIC_MLP_FAMILIES
 
 
 # ---------------------------------------------------------------------------
 # Weight memory
 # ---------------------------------------------------------------------------
 
+def embedding_params(arch: ArchHints) -> int:
+    """Parameters stored at full precision in a k-bit quantized model: the
+    input embedding, the lm_head when untied, and the (tiny) norm weights."""
+    copies = 1 if arch.tie_word_embeddings else 2
+    embeds = arch.vocab_size * arch.hidden_size * copies
+    norms = arch.num_hidden_layers * 2 * arch.hidden_size + arch.hidden_size
+    return embeds + norms
+
+
 def weights_bytes(
     *,
     num_params: int,
     base_dtype: str,
     quantization: str | None,
+    arch: ArchHints | None = None,
+    kbit_upcast_fp32: bool = True,
 ) -> float:
     """Bytes used to store the *base* model weights at rest.
 
-    ``quantization`` overrides ``base_dtype`` when set. Adds a small overhead
-    for absmax / lookup tables for 4/8-bit schemes.
+    ``quantization`` overrides ``base_dtype`` when set. For 4/8-bit schemes,
+    only the transformer Linear layers are actually quantized by bitsandbytes;
+    embeddings / lm_head / norms stay in full precision — and PEFT's
+    ``prepare_model_for_kbit_training`` upcasts them to fp32
+    (``kbit_upcast_fp32``). When ``arch`` is unknown we fall back to the old
+    all-params-quantized lower bound.
     """
     if quantization and quantization.lower() not in {"none", "fp16", "bf16", "fp32"}:
         q = quantization.lower()
         bytes_per_param = dtype_bytes(_quant_storage_dtype(q))
         overhead = quant_overhead(q)
-        return num_params * (bytes_per_param + overhead)
+        if arch is None:
+            return num_params * (bytes_per_param + overhead)
+        full_precision = min(num_params, embedding_params(arch))
+        linear = max(0, num_params - full_precision)
+        fp_bytes = 4.0 if kbit_upcast_fp32 else dtype_bytes(base_dtype)
+        return linear * (bytes_per_param + overhead) + full_precision * fp_bytes
     return num_params * dtype_bytes(base_dtype)
 
 
@@ -64,6 +107,18 @@ def _quant_storage_dtype(quantization: str) -> str:
     if quantization in {"nf4", "fp4", "int4", "nf4_double_quant"}:
         return "nf4"
     raise ValueError(f"Unknown quantization {quantization!r}")
+
+
+def dequant_workspace_bytes(*, arch: ArchHints, quantization: str | None) -> float:
+    """Transient buffers bitsandbytes uses to dequantize one layer's weights.
+
+    Each 4-bit matmul materializes a bf16 copy of the weight tile; the largest
+    resident copy is the MLP projection (hidden x intermediate), and forward +
+    backward can hold two of them briefly. Zero for non-quantized runs.
+    """
+    if not quantization or quantization.lower() in {"none", "fp16", "bf16", "fp32"}:
+        return 0.0
+    return 2.0 * arch.hidden_size * arch.intermediate_size * 2.0
 
 
 # ---------------------------------------------------------------------------
@@ -183,12 +238,22 @@ def lora_trainable_params(
     return int(total)
 
 
+def adapter_weights_bytes(*, trainable_params: int) -> float:
+    """Bytes for the LoRA adapter weights themselves.
+
+    PEFT keeps adapters in fp32 on quantized bases (``prepare_model_for_
+    kbit_training``) and they are tiny either way, so charge 4 B/param.
+    """
+    return trainable_params * 4.0
+
+
 # ---------------------------------------------------------------------------
 # Gradients
 # ---------------------------------------------------------------------------
 
-def gradients_bytes(*, trainable_params: int, grad_dtype: str = "bf16") -> float:
-    """Gradient buffer bytes. With LoRA, gradients exist only for adapters."""
+def gradients_bytes(*, trainable_params: int, grad_dtype: str = "fp32") -> float:
+    """Gradient buffer bytes. With LoRA, gradients exist only for adapters
+    (which PEFT keeps in fp32, hence the fp32 default)."""
     return trainable_params * dtype_bytes(grad_dtype)
 
 
@@ -226,6 +291,17 @@ def optimizer_bytes(*, trainable_params: int, optimizer: str) -> float:
 # Activations
 # ---------------------------------------------------------------------------
 
+# Fitted per-layer activation coefficients (see module docstring):
+#   * ATTN_SCALARS x hidden scalars for the attention block, norms, and
+#     residual stream (q/k/v/sdpa-out/o-out + fp32 RMSNorm intermediates).
+#   * MLP tensors proportional to intermediate_size: gate/up/act/mul for
+#     SwiGLU, fc1-out/act for classic MLPs. Under QLoRA these are held in
+#     fp32 (bitsandbytes/kbit-prepare upcasting), measured at ~4 B/scalar.
+ATTN_SCALARS = 9.0
+MLP_TENSORS_SWIGLU = 4.5
+MLP_TENSORS_CLASSIC = 2.8
+
+
 def per_layer_activation_bytes(
     *,
     seq_len: int,
@@ -234,45 +310,46 @@ def per_layer_activation_bytes(
     activation_dtype: str = "bf16",
     use_gradient_checkpointing: bool = False,
     attention_implementation: str = "sdpa",
+    family: str = "llama",
+    quantized_base: bool = False,
 ) -> float:
     """Per-transformer-layer activation bytes (training, mixed precision).
 
-    Based on the activation-memory accounting in "Reducing Activation
-    Recomputation in Large Transformer Models" (Korthikanti et al., 2022),
-    Eq. 2 (per-layer activations):
+    Shaped after the accounting in "Reducing Activation Recomputation in Large
+    Transformer Models" (Korthikanti et al., 2022), with two changes grounded
+    in measurement on the modern HF stack:
 
-        s * b * h * (34 + 5 * a * s / h)
+      * Fused flash / SDPA attention does not materialize the (b, a, s, s)
+        softmax matrix, so that term only applies to ``eager`` attention.
+      * SwiGLU MLPs keep ~4.5 intermediate tensors of width
+        ``intermediate_size`` alive, and under QLoRA those intermediates are
+        stored in fp32 (~4 B/scalar) rather than bf16.
 
-    Notes:
-      * The original derivation assumes vanilla scaled dot-product attention
-        which materializes the (b, a, s, s) attention probability matrix.
-        Modern flash / SDPA fused kernels skip that buffer; we deduct it via
-        ``attention_implementation="flash"`` or ``"sdpa"``.
-      * With *full* activation recomputation the per-layer cost collapses to
-        roughly ``s * b * h`` (only the inputs to each block are kept). HF's
-        ``gradient_checkpointing=True`` is effectively this.
-      * We multiply by ``dtype_bytes(activation_dtype)`` at the end so the
-        scalar count maps to actual bytes.
+    With gradient checkpointing only each block's input is kept; the
+    recomputation peak of a single layer is added once by
+    :func:`activations_bytes`, not per layer.
     """
     s = seq_len
     b = batch_size
     h = arch.hidden_size
+    ff = arch.intermediate_size
     a = max(1, arch.num_attention_heads)
 
-    bytes_per_scalar = dtype_bytes(activation_dtype)
+    act_bytes = dtype_bytes(activation_dtype)
 
     if use_gradient_checkpointing:
         # Activation recomputation: only the block input is kept.
-        scalars = s * b * h * 2.0
-        return scalars * bytes_per_scalar
+        return s * b * 2.0 * h * act_bytes
 
-    attn_extra = 5.0 * a * s / max(1, h)
-    if attention_implementation.lower() in {"flash", "flash_attention_2", "sdpa"}:
-        # Fused attention doesn't materialize the s x s softmax matrix.
-        attn_extra = 0.0
-    base = 34.0
-    scalars = s * b * h * (base + attn_extra)
-    return scalars * bytes_per_scalar
+    mlp_tensors = MLP_TENSORS_SWIGLU if _is_swiglu(family) else MLP_TENSORS_CLASSIC
+    mlp_scalar_bytes = 4.0 if quantized_base else act_bytes
+
+    layer = s * b * (ATTN_SCALARS * h * act_bytes + mlp_tensors * ff * mlp_scalar_bytes)
+    if attention_implementation.lower() not in {"flash", "flash_attention_2", "sdpa"}:
+        # Eager attention materializes the (b, a, s, s) probability matrix
+        # for forward and backward.
+        layer += 5.0 * a * s * s * b * act_bytes
+    return layer
 
 
 def activations_bytes(
@@ -283,17 +360,58 @@ def activations_bytes(
     activation_dtype: str = "bf16",
     use_gradient_checkpointing: bool = False,
     attention_implementation: str = "sdpa",
+    family: str = "llama",
+    quantized_base: bool = False,
 ) -> float:
-    """Sum per-layer activations across the whole transformer stack."""
+    """Sum activations across the whole transformer stack.
+
+    With gradient checkpointing the total is ``layers x saved-input`` plus the
+    recomputation peak of one full layer (recomputation happens one layer at a
+    time during backward).
+    """
+    kwargs = {
+        "seq_len": seq_len,
+        "batch_size": batch_size,
+        "arch": arch,
+        "activation_dtype": activation_dtype,
+        "attention_implementation": attention_implementation,
+        "family": family,
+        "quantized_base": quantized_base,
+    }
     per_layer = per_layer_activation_bytes(
-        seq_len=seq_len,
-        batch_size=batch_size,
-        arch=arch,
-        activation_dtype=activation_dtype,
-        use_gradient_checkpointing=use_gradient_checkpointing,
-        attention_implementation=attention_implementation,
+        use_gradient_checkpointing=use_gradient_checkpointing, **kwargs
     )
-    return per_layer * arch.num_hidden_layers
+    total = per_layer * arch.num_hidden_layers
+    if use_gradient_checkpointing:
+        total += per_layer_activation_bytes(use_gradient_checkpointing=False, **kwargs)
+    return total
+
+
+# ---------------------------------------------------------------------------
+# Logits / loss chain
+# ---------------------------------------------------------------------------
+
+def logits_loss_bytes(
+    *,
+    seq_len: int,
+    batch_size: int,
+    vocab_size: int,
+    logits_dtype: str = "bf16",
+) -> float:
+    """Peak bytes of the lm_head output and the cross-entropy loss chain.
+
+    transformers materializes the full ``(b, s, vocab)`` logits tensor during
+    training and upcasts it to fp32 for the loss; the backward pass allocates
+    an fp32 gradient of the same shape. Measured on Qwen2.5 (vocab 151936)
+    this chain costs ~14 B per token per vocab entry with bf16 logits:
+    logits (2) + fp32 upcast (4) + log-softmax workspace (4) + grad (4).
+
+    For large-vocab models this is the single biggest training buffer —
+    e.g. seq 2048, vocab 152k => ~4.1 GiB — and it is unaffected by gradient
+    checkpointing. (Fused-CE kernels such as Liger remove most of it; we model
+    the stock HF Trainer path.)
+    """
+    return seq_len * batch_size * vocab_size * (dtype_bytes(logits_dtype) + 12.0)
 
 
 # ---------------------------------------------------------------------------

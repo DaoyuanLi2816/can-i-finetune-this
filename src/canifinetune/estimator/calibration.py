@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field
 from ..utils.logging import get_logger
 
 if TYPE_CHECKING:
-    from .memory import EstimateRequest, MemoryBreakdown
+    from .memory import MemoryBreakdown
 
 log = get_logger("estimator.calibration")
 
@@ -79,17 +79,6 @@ def save_calibration(calib: Calibration, path: Path | None = None) -> Path:
 # Apply calibration to an estimate
 # ---------------------------------------------------------------------------
 
-def _select_relevant(samples: list[CalibrationSample], request: EstimateRequest, family: str | None) -> list[CalibrationSample]:
-    out = []
-    for s in samples:
-        if family and s.model_family.lower() != family.lower():
-            continue
-        if s.method.lower() != request.method.lower():
-            continue
-        out.append(s)
-    return out
-
-
 def fit_calibration_from_samples(samples: list[CalibrationSample]) -> Calibration:
     """Fit simple multiplicative scalars from a set of samples.
 
@@ -123,8 +112,6 @@ def fit_calibration_from_samples(samples: list[CalibrationSample]) -> Calibratio
 def apply_calibration(
     breakdown: MemoryBreakdown,
     calibration: Calibration | None,
-    *,
-    request: EstimateRequest = None,  # type: ignore[assignment]
 ) -> MemoryBreakdown:
     """Return ``breakdown`` adjusted by ``calibration``. No-op if unset."""
     if calibration is None or not calibration.has_data():
@@ -134,10 +121,14 @@ def apply_calibration(
 
     s = calibration
     new_act = breakdown.activations_gb * s.activation_scale
+    new_logits = breakdown.logits_gb * s.activation_scale
     new_static = breakdown.static_model_gb * s.weights_scale
     new_overhead = breakdown.cuda_overhead_gb * s.overhead_scale
-    delta = (new_act - breakdown.activations_gb) + (new_static - breakdown.static_model_gb) + (
-        new_overhead - breakdown.cuda_overhead_gb
+    delta = (
+        (new_act - breakdown.activations_gb)
+        + (new_logits - breakdown.logits_gb)
+        + (new_static - breakdown.static_model_gb)
+        + (new_overhead - breakdown.cuda_overhead_gb)
     )
     return MemoryBreakdown(
         static_model_gb=round(new_static, 4),
@@ -146,6 +137,7 @@ def apply_calibration(
         gradients_gb=breakdown.gradients_gb,
         optimizer_gb=breakdown.optimizer_gb,
         activations_gb=round(new_act, 4),
+        logits_gb=round(new_logits, 4),
         cuda_overhead_gb=round(new_overhead, 4),
         safety_margin_gb=breakdown.safety_margin_gb,
         total_estimated_gb=round(breakdown.total_estimated_gb + delta, 4),
@@ -172,6 +164,12 @@ def calibration_from_result_files(paths: list[Path]) -> Calibration:
 
 
 def _result_to_sample(data: dict[str, Any]) -> CalibrationSample | None:
+    measured_gb = float(data.get("measured", {}).get("peak_total_gb") or 0.0)
+    if measured_gb < 0.3:
+        # Tiny smoke runs (e.g. sshleifer/tiny-gpt2) are dominated by fixed
+        # overheads and would skew the fitted ratio.
+        log.info("Skipping smoke-scale result (%.2f GB measured) for calibration.", measured_gb)
+        return None
     try:
         return CalibrationSample(
             gpu_name=str(data.get("gpu", {}).get("name") or "unknown"),

@@ -59,8 +59,9 @@ DTYPE_BYTES_PER_PARAM: dict[str, float] = {
 # (absmax scalars, optional zero points, block tables). Values are in bytes.
 # References:
 #  * NF4 with blocksize 64 and fp32 absmax: 4 bytes / 64 params ~= 0.0625 B/param
-#  * NF4 + double quantization compresses the absmax block to ~8-bit,
-#    leaving roughly 0.0125 B/param.
+#  * NF4 + double quantization stores the absmax in int8 (1 byte / 64 params)
+#    plus a small fp32 second-level block: ~0.017 B/param (measured via
+#    bitsandbytes quant_state on Qwen2.5-1.5B).
 #  * INT8 LLM.int8() / bitsandbytes Linear8bitLt keeps both the int8 weight
 #    and a small fp16 outlier matrix; we approximate the overhead at 0.15 B/param
 #    to cover that and statistics.
@@ -74,7 +75,7 @@ QUANT_OVERHEAD_BYTES_PER_PARAM: dict[str, float] = {
     "fp8": 0.0,
     "int8": 0.15,
     "nf4": 0.0625,
-    "nf4_double_quant": 0.0125,
+    "nf4_double_quant": 0.017,
     "fp4": 0.0625,
     "int4": 0.0625,
 }

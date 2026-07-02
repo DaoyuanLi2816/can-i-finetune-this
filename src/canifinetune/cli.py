@@ -193,6 +193,7 @@ def _print_estimate(est) -> None:
     table.add_row("gradients", f"{mem.gradients_gb:.3f}")
     table.add_row("optimizer states", f"{mem.optimizer_gb:.3f}")
     table.add_row("activations", f"{mem.activations_gb:.3f}")
+    table.add_row("logits / loss", f"{mem.logits_gb:.3f}")
     table.add_row("CUDA / fragmentation", f"{mem.cuda_overhead_gb:.3f}")
     table.add_row("safety margin", f"{mem.safety_margin_gb:.3f}")
     table.add_row("[bold]total[/bold]", f"[bold]{mem.total_estimated_gb:.3f}[/bold]")

@@ -125,8 +125,9 @@ def test_estimate_qlora_7b_marginal_or_yes_on_16gb_with_checkpointing():
         )
     )
     assert est.feasible in {"yes", "marginal", "no"}
-    # 7B params at ~0.51 B/param = ~3.6 GB weights — gradients + optimizer of LoRA tiny.
-    assert est.memory.static_model_gb < 6.0
+    # 6.5B linear params packed 4-bit (~3.1 GB) + untied embedding & lm_head
+    # upcast to fp32 by kbit-prepare (~4.1 GB). Measured 7.21 GiB on a 4080.
+    assert 6.5 < est.memory.static_model_gb < 8.0
 
 
 def test_estimate_warnings_include_high_seq_len():
@@ -179,9 +180,11 @@ def test_estimate_total_is_sum_of_components():
     parts = est.memory
     s = (
         parts.static_model_gb
+        + parts.quantization_overhead_gb
         + parts.gradients_gb
         + parts.optimizer_gb
         + parts.activations_gb
+        + parts.logits_gb
         + parts.cuda_overhead_gb
         + parts.safety_margin_gb
     )

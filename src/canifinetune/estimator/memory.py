@@ -60,6 +60,7 @@ class MemoryBreakdown(BaseModel):
     gradients_gb: float
     optimizer_gb: float
     activations_gb: float
+    logits_gb: float = 0.0
     cuda_overhead_gb: float
     safety_margin_gb: float
     total_estimated_gb: float
@@ -80,40 +81,33 @@ class Estimate(BaseModel):
 def _compute_breakdown(req: EstimateRequest, md: ModelMetadata) -> MemoryBreakdown:
     arch = md.arch
     total_params = md.total_params
+    quantized = req.method == "qlora"
 
-    # 1) Weights.
-    if req.method == "qlora":
-        weights_b = F.weights_bytes(
-            num_params=total_params,
-            base_dtype=req.base_dtype,
-            quantization=req.quantization,
+    # 1) Weights. For QLoRA only the Linear layers are 4-bit; embeddings,
+    #    lm_head, and norms stay full precision and are upcast to fp32 by
+    #    PEFT's prepare_model_for_kbit_training.
+    weights_b = F.weights_bytes(
+        num_params=total_params,
+        base_dtype=req.base_dtype,
+        quantization=req.quantization if quantized else None,
+        arch=arch,
+    )
+    # Quantization side costs surfaced separately: absmax / quant-state
+    # metadata plus the transient bf16 dequantization workspace.
+    if quantized:
+        from ..utils.units import quant_overhead
+
+        linear_params = max(0, total_params - F.embedding_params(arch))
+        quant_overhead_b = linear_params * quant_overhead(req.quantization) + (
+            F.dequant_workspace_bytes(arch=arch, quantization=req.quantization)
         )
-        weights_baseline = F.weights_bytes(
-            num_params=total_params, base_dtype=req.base_dtype, quantization=None
-        )
-        quant_overhead_b = max(0.0, weights_baseline * 0.0)  # baseline only used for ratio
-        # The overhead vs. raw int4 storage is captured inside weights_bytes,
-        # but we surface a separate "quantization_overhead" number relative to
-        # the raw quantized weight count.
-        from ..utils.units import dtype_bytes
-        raw_q = total_params * dtype_bytes("nf4")
-        quant_overhead_b = max(0.0, weights_b - raw_q)
-    elif req.method == "lora":
-        weights_b = F.weights_bytes(
-            num_params=total_params,
-            base_dtype=req.base_dtype,
-            quantization=None,
-        )
-        quant_overhead_b = 0.0
-    else:  # full
-        weights_b = F.weights_bytes(
-            num_params=total_params, base_dtype=req.base_dtype, quantization=None
-        )
+    else:
         quant_overhead_b = 0.0
 
     # 2) Trainable params.
     if req.method == "full":
         trainable_params = total_params
+        adapter_b = 0.0  # already counted in weights
     else:
         trainable_params = F.lora_trainable_params(
             arch=arch,
@@ -121,9 +115,14 @@ def _compute_breakdown(req: EstimateRequest, md: ModelMetadata) -> MemoryBreakdo
             rank=req.lora_rank,
             scope=req.lora_target_scope,
         )
+        adapter_b = F.adapter_weights_bytes(trainable_params=trainable_params)
 
-    # 3) Gradients.
-    grad_b = F.gradients_bytes(trainable_params=trainable_params, grad_dtype="bf16")
+    # 3) Gradients (fp32 for LoRA adapters, bf16 for full fine-tunes where
+    #    the fp32 master copy lives in the optimizer term).
+    grad_b = F.gradients_bytes(
+        trainable_params=trainable_params,
+        grad_dtype="bf16" if req.method == "full" else "fp32",
+    )
 
     # 4) Optimizer states.
     opt_b = F.optimizer_bytes(trainable_params=trainable_params, optimizer=req.optimizer)
@@ -136,21 +135,36 @@ def _compute_breakdown(req: EstimateRequest, md: ModelMetadata) -> MemoryBreakdo
         activation_dtype=req.activation_dtype,
         use_gradient_checkpointing=req.gradient_checkpointing,
         attention_implementation=req.attention_implementation,
+        family=md.family,
+        quantized_base=quantized,
     )
 
-    # 6) CUDA / fragmentation / safety.
+    # 6) Logits + cross-entropy chain. Unaffected by gradient checkpointing;
+    #    dominates for large-vocab models at long seq_len.
+    logits_b = F.logits_loss_bytes(
+        seq_len=req.seq_len,
+        batch_size=req.micro_batch_size,
+        vocab_size=arch.vocab_size,
+        logits_dtype=req.activation_dtype,
+    )
+
+    # 7) CUDA / fragmentation / safety.
     cuda_b = F.cuda_overhead_bytes(available_vram_gb=req.gpu_vram_gb)
     safety_b = F.safety_margin_bytes(available_vram_gb=req.gpu_vram_gb)
 
-    total_b = weights_b + grad_b + opt_b + act_b + cuda_b + safety_b
+    total_b = (
+        weights_b + quant_overhead_b + adapter_b + grad_b + opt_b
+        + act_b + logits_b + cuda_b + safety_b
+    )
 
     return MemoryBreakdown(
-        static_model_gb=round(bytes_to_gb(weights_b), 4),
+        static_model_gb=round(bytes_to_gb(weights_b + adapter_b), 4),
         quantization_overhead_gb=round(bytes_to_gb(quant_overhead_b), 4),
         trainable_params_mb=round(trainable_params / 1e6, 3),
         gradients_gb=round(bytes_to_gb(grad_b), 4),
         optimizer_gb=round(bytes_to_gb(opt_b), 4),
         activations_gb=round(bytes_to_gb(act_b), 4),
+        logits_gb=round(bytes_to_gb(logits_b), 4),
         cuda_overhead_gb=round(bytes_to_gb(cuda_b), 4),
         safety_margin_gb=round(bytes_to_gb(safety_b), 4),
         total_estimated_gb=round(bytes_to_gb(total_b), 4),
@@ -175,7 +189,15 @@ def _build_assumptions(req: EstimateRequest, md: ModelMetadata) -> list[str]:
         f"activation_dtype={req.activation_dtype}",
         f"optimizer={req.optimizer}",
         f"lora_rank={req.lora_rank}, target_scope={req.lora_target_scope}",
+        f"logits/loss chain models the stock HF Trainer path "
+        f"(full fp32 logits for vocab_size={md.arch.vocab_size:,}); "
+        "fused-CE kernels (e.g. Liger) would shrink the 'logits' component",
     ]
+    if req.method == "qlora":
+        out.append(
+            "qlora: embeddings/lm_head/norms are NOT quantized and are upcast "
+            "to fp32 by peft's prepare_model_for_kbit_training"
+        )
     if req.method == "full":
         out.append(
             "full fine-tune: gradients and optimizer states cover *all* params; "
@@ -188,10 +210,6 @@ def _build_warnings(
     req: EstimateRequest, md: ModelMetadata, breakdown: MemoryBreakdown
 ) -> list[str]:
     warnings: list[str] = []
-    if req.method == "lora" and req.quantization.lower() not in {"none", "fp16", "bf16", "fp32"}:
-        warnings.append(
-            "lora method ignores --quantization other than fp16/bf16/fp32. Use 'qlora' for 4-bit."
-        )
     if req.seq_len >= 8192:
         warnings.append(
             "seq_len>=8192: activations dominate the estimate; static numbers are less reliable. "
@@ -201,9 +219,11 @@ def _build_warnings(
         warnings.append(
             "micro_batch_size>4 is uncommon for LoRA/QLoRA on consumer GPUs; verify with bench."
         )
-    if breakdown.activations_gb / max(breakdown.total_estimated_gb, 1e-6) > 0.6:
+    dynamic_gb = breakdown.activations_gb + breakdown.logits_gb
+    if dynamic_gb / max(breakdown.total_estimated_gb, 1e-6) > 0.6:
         warnings.append(
-            "Activations dominate (>60% of total). Confidence on activation estimate is lower than weights."
+            "Activations + logits dominate (>60% of total). Confidence on these terms is "
+            "lower than on weights; a fused-CE kernel or shorter seq_len shrinks them."
         )
     return warnings
 
@@ -222,7 +242,7 @@ def estimate(req: EstimateRequest) -> Estimate:
     """Static memory + feasibility estimate."""
     md = fetch_metadata(req.model_id, override=req.override)
     breakdown = _compute_breakdown(req, md)
-    breakdown = apply_calibration(breakdown, req.calibration, request=req)
+    breakdown = apply_calibration(breakdown, req.calibration)
     feasibility, ratio = _classify_feasibility(
         total_gb=breakdown.total_estimated_gb, gpu_vram_gb=req.gpu_vram_gb
     )

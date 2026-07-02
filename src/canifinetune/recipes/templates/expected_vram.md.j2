@@ -31,6 +31,7 @@ Numbers are **predictions**, not measurements. Real VRAM may differ; run
 | gradients | {{ "%.3f"|format(estimate_memory.gradients_gb) }} |
 | optimizer states | {{ "%.3f"|format(estimate_memory.optimizer_gb) }} |
 | activations | {{ "%.3f"|format(estimate_memory.activations_gb) }} |
+| logits / loss chain | {{ "%.3f"|format(estimate_memory.logits_gb) }} |
 | CUDA / fragmentation overhead | {{ "%.3f"|format(estimate_memory.cuda_overhead_gb) }} |
 | safety margin | {{ "%.3f"|format(estimate_memory.safety_margin_gb) }} |
 | **total estimated** | **{{ "%.3f"|format(estimate_memory.total_estimated_gb) }}** |

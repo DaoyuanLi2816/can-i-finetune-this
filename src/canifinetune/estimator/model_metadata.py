@@ -55,6 +55,7 @@ KNOWN_MODELS: dict[str, dict[str, Any]] = {
         "intermediate_size": 4,
         "vocab_size": 50257,
         "total_params": 100_000,
+        "tie_word_embeddings": True,
     },
     "hf-internal-testing/tiny-random-LlamaForCausalLM": {
         "family": "llama",
@@ -65,6 +66,7 @@ KNOWN_MODELS: dict[str, dict[str, Any]] = {
         "intermediate_size": 64,
         "vocab_size": 32000,
         "total_params": 1_000_000,
+        "tie_word_embeddings": False,
     },
     "Qwen/Qwen2.5-0.5B-Instruct": {
         "family": "qwen2",
@@ -75,6 +77,7 @@ KNOWN_MODELS: dict[str, dict[str, Any]] = {
         "intermediate_size": 4864,
         "vocab_size": 151936,
         "total_params": 494_032_768,
+        "tie_word_embeddings": True,
     },
     "Qwen/Qwen2.5-1.5B-Instruct": {
         "family": "qwen2",
@@ -85,6 +88,7 @@ KNOWN_MODELS: dict[str, dict[str, Any]] = {
         "intermediate_size": 8960,
         "vocab_size": 151936,
         "total_params": 1_543_714_304,
+        "tie_word_embeddings": True,
     },
     "Qwen/Qwen2.5-3B-Instruct": {
         "family": "qwen2",
@@ -95,6 +99,7 @@ KNOWN_MODELS: dict[str, dict[str, Any]] = {
         "intermediate_size": 11008,
         "vocab_size": 151936,
         "total_params": 3_085_938_688,
+        "tie_word_embeddings": True,
     },
     "Qwen/Qwen2.5-7B-Instruct": {
         "family": "qwen2",
@@ -105,6 +110,7 @@ KNOWN_MODELS: dict[str, dict[str, Any]] = {
         "intermediate_size": 18944,
         "vocab_size": 152064,
         "total_params": 7_615_616_512,
+        "tie_word_embeddings": False,
     },
     "meta-llama/Llama-3.1-8B-Instruct": {
         "family": "llama",
@@ -115,6 +121,7 @@ KNOWN_MODELS: dict[str, dict[str, Any]] = {
         "intermediate_size": 14336,
         "vocab_size": 128256,
         "total_params": 8_030_261_248,
+        "tie_word_embeddings": False,
     },
     "mistralai/Mistral-7B-v0.1": {
         "family": "mistral",
@@ -125,6 +132,7 @@ KNOWN_MODELS: dict[str, dict[str, Any]] = {
         "intermediate_size": 14336,
         "vocab_size": 32000,
         "total_params": 7_241_732_096,
+        "tie_word_embeddings": False,
     },
     "microsoft/phi-2": {
         "family": "phi",
@@ -135,6 +143,7 @@ KNOWN_MODELS: dict[str, dict[str, Any]] = {
         "intermediate_size": 10240,
         "vocab_size": 51200,
         "total_params": 2_779_683_840,
+        "tie_word_embeddings": False,
     },
     "google/gemma-2b": {
         "family": "gemma",
@@ -145,6 +154,7 @@ KNOWN_MODELS: dict[str, dict[str, Any]] = {
         "intermediate_size": 16384,
         "vocab_size": 256000,
         "total_params": 2_506_172_416,
+        "tie_word_embeddings": True,
     },
     "TinyLlama/TinyLlama-1.1B-Chat-v1.0": {
         "family": "llama",
@@ -155,6 +165,7 @@ KNOWN_MODELS: dict[str, dict[str, Any]] = {
         "intermediate_size": 5632,
         "vocab_size": 32000,
         "total_params": 1_100_048_384,
+        "tie_word_embeddings": False,
     },
 }
 
@@ -168,6 +179,7 @@ def register_known_model(model_id: str, spec: dict[str, Any]) -> None:
 
 
 def _from_spec(model_id: str, spec: dict[str, Any], *, source: str) -> ModelMetadata:
+    family = str(spec.get("family", _guess_family(model_id)))
     arch = ArchHints(
         hidden_size=int(spec["hidden_size"]),
         num_hidden_layers=int(spec["num_hidden_layers"]),
@@ -177,11 +189,12 @@ def _from_spec(model_id: str, spec: dict[str, Any], *, source: str) -> ModelMeta
         ),
         intermediate_size=int(spec["intermediate_size"]),
         vocab_size=int(spec["vocab_size"]),
+        tie_word_embeddings=bool(spec.get("tie_word_embeddings", True)),
     )
-    total = int(spec.get("total_params") or _estimate_param_count(arch))
+    total = int(spec.get("total_params") or _estimate_param_count(arch, family=family))
     return ModelMetadata(
         model_id=model_id,
-        family=str(spec.get("family", _guess_family(model_id))),
+        family=family,
         arch=arch,
         total_params=total,
         source=source,
@@ -219,6 +232,7 @@ def _from_hf_config(model_id: str, cfg: dict[str, Any]) -> ModelMetadata | None:
         log.warning("Cannot read arch from HF config for %s: %s", model_id, e)
         return None
 
+    family = str(cfg.get("model_type", _guess_family(model_id)))
     arch = ArchHints(
         hidden_size=hidden,
         num_hidden_layers=layers,
@@ -226,9 +240,9 @@ def _from_hf_config(model_id: str, cfg: dict[str, Any]) -> ModelMetadata | None:
         num_key_value_heads=kv,
         intermediate_size=ffn,
         vocab_size=vocab,
+        tie_word_embeddings=bool(cfg.get("tie_word_embeddings", True)),
     )
-    total = int(_estimate_param_count(arch))
-    family = str(cfg.get("model_type", _guess_family(model_id)))
+    total = int(_estimate_param_count(arch, family=family))
     return ModelMetadata(
         model_id=model_id,
         family=family,
@@ -239,7 +253,7 @@ def _from_hf_config(model_id: str, cfg: dict[str, Any]) -> ModelMetadata | None:
     )
 
 
-def _estimate_param_count(arch: ArchHints) -> int:
+def _estimate_param_count(arch: ArchHints, *, family: str = "llama") -> int:
     """Rough param count from arch hints (used when total_params is unknown)."""
     h = arch.hidden_size
     ff = arch.intermediate_size
@@ -251,12 +265,15 @@ def _estimate_param_count(arch: ArchHints) -> int:
     kv_dim = head_dim * kv
     # Per-layer params:
     #   attn: q (h*h) + k (h*kv) + v (h*kv) + o (h*h) = 2*h*h + 2*h*kv
-    #   ffn (SwiGLU-style): gate (h*ff) + up (h*ff) + down (ff*h) = 3*h*ff
+    #   ffn: SwiGLU has gate + up + down = 3*h*ff; classic MLPs (gpt2, phi,
+    #        opt, ...) have fc1 + fc2 = 2*h*ff
     #   norms: 2*h
-    per_layer = 2 * h * h + 2 * h * kv_dim + 3 * h * ff + 2 * h
-    # Embeddings (tied with lm_head in many models, but we count once and trust
-    # the table for famous families).
-    embeds = vocab * h
+    from .formulas import CLASSIC_MLP_FAMILIES
+
+    ffn_matmuls = 2 if (family or "").lower() in CLASSIC_MLP_FAMILIES else 3
+    per_layer = 2 * h * h + 2 * h * kv_dim + ffn_matmuls * h * ff + 2 * h
+    # Input embedding, counted twice when lm_head is untied.
+    embeds = vocab * h * (1 if arch.tie_word_embeddings else 2)
     final_norm = h
     return per_layer * layers + embeds + final_norm
 
