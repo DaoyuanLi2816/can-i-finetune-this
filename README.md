@@ -223,12 +223,8 @@ Contributions welcome.
 
 ## Star History
 
-<a href="https://star-history.com/#DaoyuanLi2816/can-i-finetune-this&Date">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=DaoyuanLi2816/can-i-finetune-this&type=Date&theme=dark" />
-    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=DaoyuanLi2816/can-i-finetune-this&type=Date" />
-    <img alt="Star history chart" src="https://api.star-history.com/svg?repos=DaoyuanLi2816/can-i-finetune-this&type=Date" />
-  </picture>
+<a href="https://github.com/DaoyuanLi2816/can-i-finetune-this/stargazers">
+  <img alt="Star history chart" src="https://raw.githubusercontent.com/DaoyuanLi2816/can-i-finetune-this/main/docs/star-history.svg" width="800" />
 </a>
 
 ---
