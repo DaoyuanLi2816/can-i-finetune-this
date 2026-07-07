@@ -221,14 +221,6 @@ Contributions welcome.
 
 ---
 
-## Star History
-
-<a href="https://github.com/DaoyuanLi2816/can-i-finetune-this/stargazers">
-  <img alt="Star history chart" src="https://raw.githubusercontent.com/DaoyuanLi2816/can-i-finetune-this/main/docs/star-history.svg" width="800" />
-</a>
-
----
-
 ## License
 
 MIT. See `LICENSE`.
