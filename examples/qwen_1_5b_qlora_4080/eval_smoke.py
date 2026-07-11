@@ -29,9 +29,15 @@ def main() -> int:
         tok.pad_token = tok.eos_token
 
     dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
-    model = AutoModelForCausalLM.from_pretrained(
-        args.base_model, torch_dtype=dtype, device_map="auto"
-    )
+    # transformers 5.0 renamed torch_dtype -> dtype; try the new name first.
+    try:
+        model = AutoModelForCausalLM.from_pretrained(
+            args.base_model, dtype=dtype, device_map="auto"
+        )
+    except TypeError:
+        model = AutoModelForCausalLM.from_pretrained(
+            args.base_model, torch_dtype=dtype, device_map="auto"
+        )
 
     adapter = Path(args.adapter)
     if adapter.is_dir():
