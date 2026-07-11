@@ -188,11 +188,15 @@ def _build_assumptions(req: EstimateRequest, md: ModelMetadata) -> list[str]:
         f"attention_implementation={req.attention_implementation}",
         f"activation_dtype={req.activation_dtype}",
         f"optimizer={req.optimizer}",
-        f"lora_rank={req.lora_rank}, target_scope={req.lora_target_scope}",
         f"logits/loss chain models the stock HF Trainer path "
         f"(full fp32 logits for vocab_size={md.arch.vocab_size:,}); "
         "fused-CE kernels (e.g. Liger) would shrink the 'logits' component",
     ]
+    if req.method != "full":
+        # LoRA rank / target scope are meaningless for a full fine-tune (no
+        # adapters are added; every parameter is trainable), so only surface
+        # this assumption when it actually applies.
+        out.append(f"lora_rank={req.lora_rank}, target_scope={req.lora_target_scope}")
     if req.method == "qlora":
         out.append(
             "qlora: embeddings/lm_head/norms are NOT quantized and are upcast "
