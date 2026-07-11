@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
+import sys
 from pathlib import Path
 
 import typer
@@ -12,6 +14,15 @@ from rich.table import Table
 
 from . import __version__
 from .utils.logging import get_logger, to_json
+
+# Rich renders table rules/truncation with Unicode characters (box-drawing,
+# "…"). On Windows the default stdout/stderr codepage is often not UTF-8
+# (e.g. cp936/cp1252), which turns those into "?"/mojibake instead of raising
+# — reconfigure both streams to UTF-8 up front so every table/panel below
+# renders correctly regardless of the OS locale.
+for _stream in (sys.stdout, sys.stderr):
+    with contextlib.suppress(AttributeError, ValueError):
+        _stream.reconfigure(encoding="utf-8")
 
 console = Console()
 err_console = Console(stderr=True)
