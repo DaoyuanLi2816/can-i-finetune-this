@@ -7,6 +7,7 @@ installed and reports it, instead of raising.
 from __future__ import annotations
 
 import importlib
+import importlib.metadata
 import platform
 import sys
 from dataclasses import asdict, dataclass, field
@@ -77,6 +78,14 @@ def _probe_library(name: str) -> LibInfo:
     except Exception as e:
         return LibInfo(name=name, installed=False, note=f"import failed: {e.__class__.__name__}")
     version = getattr(mod, "__version__", "")
+    if not version:
+        # Some packages (e.g. rich) don't set a top-level __version__; fall
+        # back to the installed-distribution metadata so the table doesn't
+        # show a blank version for a library that is clearly installed.
+        try:
+            version = importlib.metadata.version(name)
+        except importlib.metadata.PackageNotFoundError:
+            version = ""
     return LibInfo(name=name, installed=True, version=str(version))
 
 
@@ -139,7 +148,7 @@ def run_doctor() -> DoctorReport:
     elif not cuda.torch_cuda_available:
         report.issues.append(
             "torch is installed but cannot see CUDA. Install the matching CUDA wheel, e.g. "
-            "`pip install --index-url https://download.pytorch.org/whl/cu121 torch`."
+            "`pip install --index-url https://download.pytorch.org/whl/cu124 torch`."
         )
     if cuda.gpus:
         gpu0: GpuInfo = cuda.gpus[0]
