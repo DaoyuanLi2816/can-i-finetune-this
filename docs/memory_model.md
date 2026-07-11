@@ -99,15 +99,15 @@ accounted for in the optimizer term).
 
 Per-parameter bytes for the most common optimizers:
 
-| optimizer                  | bytes/param |
-| -------------------------- | ----------- |
-| adamw_torch (fp32 m+v+master)| 12.0      |
-| paged_adamw_32bit          | 12.0        |
-| adamw_8bit / paged_adamw_8bit | 2.5      |
-| sgd                        | 4.0         |
-| sgd + momentum             | 8.0         |
-| lion_8bit                  | 2.0         |
-| adafactor                  | 4.0         |
+| optimizer                      | bytes/param |
+| ------------------------------ | ----------- |
+| adamw_torch (fp32 m+v+master)  | 12.0        |
+| paged_adamw_32bit              | 12.0        |
+| adamw_8bit / paged_adamw_8bit  | 2.5         |
+| sgd                            | 4.0         |
+| sgd + momentum                 | 8.0         |
+| lion_8bit                      | 2.0         |
+| adafactor                      | 4.0         |
 
 This is multiplied by `trainable_params`, *not* total parameters. For LoRA
 / QLoRA, the optimizer footprint is consequently tiny (a few MB).
