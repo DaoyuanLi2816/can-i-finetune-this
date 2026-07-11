@@ -10,7 +10,8 @@ To regenerate any of these from scratch:
 canifinetune recipe \
   --model Qwen/Qwen2.5-1.5B-Instruct \
   --method qlora \
-  --seq-len 2048 \
+  --seq-len 1024 \
   --lora-rank 16 \
+  --max-steps 10 \
   --output examples/qwen_1_5b_qlora_4080
 ```
