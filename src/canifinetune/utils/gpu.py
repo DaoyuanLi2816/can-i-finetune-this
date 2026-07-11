@@ -97,6 +97,19 @@ def probe_gpus_via_nvidia_smi() -> list[GpuInfo]:
     return _parse_nvidia_smi(stdout)
 
 
+def _driver_version_via_nvidia_smi() -> str:
+    """Best-effort actual NVIDIA driver version (e.g. ``560.94``).
+
+    Torch does not expose this anywhere; ``torch.version.cuda`` is the CUDA
+    *runtime* version bundled with the wheel, which is a different number and
+    must not be reported as the driver version.
+    """
+    code, stdout, _ = try_run(["nvidia-smi", "--query-gpu=driver_version", "--format=csv,noheader"])
+    if code != 0 or not stdout.strip():
+        return ""
+    return stdout.strip().splitlines()[0].strip()
+
+
 def _probe_torch_cuda() -> CudaInfo:
     info = CudaInfo()
     try:
@@ -109,6 +122,11 @@ def _probe_torch_cuda() -> CudaInfo:
     info.torch_cuda_available = cuda_available
     info.torch_cuda_version = getattr(torch.version, "cuda", "") or ""
     if cuda_available:
+        # NOTE: this is the actual NVIDIA driver version, not
+        # torch.version.cuda (which is the CUDA runtime the torch wheel was
+        # built against) — the two are easy to conflate but not the same
+        # number (e.g. driver 560.94 vs CUDA runtime 12.4).
+        driver_version = _driver_version_via_nvidia_smi()
         for i in range(torch.cuda.device_count()):
             props = torch.cuda.get_device_properties(i)
             free, total = torch.cuda.mem_get_info(i)
@@ -118,7 +136,7 @@ def _probe_torch_cuda() -> CudaInfo:
                     name=props.name,
                     total_vram_gb=total / (1024**3),
                     free_vram_gb=free / (1024**3),
-                    driver_version=str(getattr(torch.version, "cuda", "")),
+                    driver_version=driver_version,
                     compute_capability=f"{props.major}.{props.minor}",
                     available=True,
                 )
