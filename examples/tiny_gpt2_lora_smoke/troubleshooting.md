@@ -33,8 +33,8 @@ checkpointing won't help with weight storage.
 
 - Your torch wheel was built for a CUDA toolkit version your driver doesn't support.
 - Reinstall torch with the right index, e.g.:
-  `pip install --index-url https://download.pytorch.org/whl/cu121 torch`.
-- For an even older driver, try `cu118`.
+  `pip install --index-url https://download.pytorch.org/whl/cu124 torch`.
+- For an older driver, try `cu121`; for an even older one, `cu118`.
 
 ## bf16 not supported
 

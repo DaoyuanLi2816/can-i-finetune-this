@@ -21,7 +21,7 @@ single-GPU QLORA fine-tuning script for **Qwen/Qwen2.5-1.5B-Instruct**.
 # 1. Install deps in a fresh venv.
 python -m venv .venv && source .venv/bin/activate   # or .\.venv\Scripts\activate on Windows
 pip install -r requirements.txt
-# For CUDA wheels: e.g. `pip install torch --index-url https://download.pytorch.org/whl/cu121`
+# For CUDA wheels: e.g. `pip install torch --index-url https://download.pytorch.org/whl/cu124`
 
 # 2. Smoke run with the bundled tiny dataset.
 python train.py --config config.yaml --max-steps 5

@@ -19,7 +19,7 @@ You have one consumer-grade NVIDIA GPU. You want to fine-tune an open-weight LLM
 with LoRA or QLoRA, but you do not want to download 14 GB of weights just to
 discover that your 12 GB / 16 GB / 24 GB card OOMs on step 1.
 
-`canifinetune` answers, before you spend the disk and the time:
+`canifinetune` answers, before you spend the disk space and the time:
 
 1. Can I fine-tune this model?
 2. About how much VRAM will it use?
@@ -101,7 +101,7 @@ PyTorch should generally be installed with the CUDA wheel that matches your driv
 e.g.
 
 ```bash
-uv pip install torch --index-url https://download.pytorch.org/whl/cu121
+uv pip install torch --index-url https://download.pytorch.org/whl/cu124
 ```
 
 See `docs/troubleshooting.md` for Windows / WSL / bitsandbytes specifics.
@@ -152,7 +152,7 @@ This project tries to answer the harder question. It models:
   `prepare_model_for_kbit_training` (4 GB on an untied 7B!)
 - The logits / cross-entropy chain (`seq × batch × vocab × ~14 B`) — the
   single biggest training buffer for modern 128k–152k-vocab models, and
-  one gradient checkpointing does not touch
+  one that gradient checkpointing does not touch
 - LoRA / QLoRA trainable parameter count for typical `target_modules`
 - Gradients only for trainable parameters
 - AdamW vs 8-bit / paged AdamW optimizer states

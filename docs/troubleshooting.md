@@ -33,13 +33,15 @@ works.
 Fix: install a torch wheel that matches your driver's CUDA support level:
 
 ```bash
-pip install --index-url https://download.pytorch.org/whl/cu121 torch
+pip install --index-url https://download.pytorch.org/whl/cu124 torch
 # or, for older drivers:
+pip install --index-url https://download.pytorch.org/whl/cu121 torch
 pip install --index-url https://download.pytorch.org/whl/cu118 torch
 ```
 
 The matrix is published at https://pytorch.org/get-started/locally/. Driver
-13.2 supports `cu121` and `cu124` wheels.
+13.2 (the version behind the RTX 4080 baselines in this repo) supports
+`cu121` and `cu124` wheels; `cu124` is what was actually used.
 
 ## Windows / WSL caveats
 
