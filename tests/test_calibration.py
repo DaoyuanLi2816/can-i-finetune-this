@@ -118,3 +118,51 @@ def test_calibration_adjusts_estimate():
     # With a 1.25x correction the calibrated estimate should be larger than baseline.
     assert adjusted.memory.total_estimated_gb > base.memory.total_estimated_gb
     assert adjusted.calibration_applied
+    assert adjusted.memory.static_model_gb == base.memory.static_model_gb
+
+
+def test_calibration_is_not_applied_to_an_unseen_family():
+    sample = CalibrationSample(
+        gpu_name="RTX 4080",
+        torch_version="2.6",
+        cuda_version="12.4",
+        model_family="qwen2",
+        method="qlora",
+        seq_len=1024,
+        micro_batch_size=1,
+        estimated_total_gb=4.0,
+        measured_total_gb=8.0,
+    )
+    calib = fit_calibration_from_samples([sample])
+
+    adjusted = estimate(
+        EstimateRequest(
+            model_id="meta-llama/Llama-3.1-8B-Instruct",
+            method="qlora",
+            gpu_vram_gb=16.0,
+            seq_len=1024,
+            calibration=calib,
+        )
+    )
+
+    assert not adjusted.calibration_applied
+
+
+def test_legacy_calibration_file_is_ignored(tmp_path: Path):
+    path = tmp_path / "legacy.json"
+    path.write_text(
+        json.dumps(
+            {
+                "samples": [],
+                "activation_scale": 0.5,
+                "weights_scale": 0.5,
+                "overhead_scale": 0.5,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    loaded = load_calibration(path)
+
+    assert not loaded.has_data()
+    assert "Legacy calibration ignored" in loaded.note

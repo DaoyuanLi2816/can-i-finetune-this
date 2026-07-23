@@ -15,7 +15,7 @@ import re
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
-from ..utils.hf import fetch_model_config
+from ..utils.hf import fetch_model_config, fetch_model_parameter_count
 from ..utils.logging import get_logger
 from .formulas import ArchHints
 
@@ -29,6 +29,7 @@ class ModelMetadata:
     arch: ArchHints
     total_params: int
     source: str = "unknown"  # "known" | "hf-config" | "override" | "heuristic"
+    parameter_count_source: str = "estimated"
     notes: str = ""
 
     def to_dict(self) -> dict[str, Any]:
@@ -52,7 +53,7 @@ KNOWN_MODELS: dict[str, dict[str, Any]] = {
         "num_hidden_layers": 2,
         "num_attention_heads": 2,
         "num_key_value_heads": 2,
-        "intermediate_size": 4,
+        "intermediate_size": 8,
         "vocab_size": 50257,
         "total_params": 100_000,
         "tie_word_embeddings": True,
@@ -184,12 +185,12 @@ def _from_spec(model_id: str, spec: dict[str, Any], *, source: str) -> ModelMeta
         hidden_size=int(spec["hidden_size"]),
         num_hidden_layers=int(spec["num_hidden_layers"]),
         num_attention_heads=int(spec["num_attention_heads"]),
-        num_key_value_heads=int(
-            spec.get("num_key_value_heads", spec["num_attention_heads"])
-        ),
+        num_key_value_heads=int(spec.get("num_key_value_heads", spec["num_attention_heads"])),
         intermediate_size=int(spec["intermediate_size"]),
         vocab_size=int(spec["vocab_size"]),
         tie_word_embeddings=bool(spec.get("tie_word_embeddings", True)),
+        num_local_experts=max(1, int(spec.get("num_local_experts", 1))),
+        num_experts_per_tok=max(1, int(spec.get("num_experts_per_tok", 1))),
     )
     total = int(spec.get("total_params") or _estimate_param_count(arch, family=family))
     return ModelMetadata(
@@ -198,34 +199,44 @@ def _from_spec(model_id: str, spec: dict[str, Any], *, source: str) -> ModelMeta
         arch=arch,
         total_params=total,
         source=source,
+        parameter_count_source="provided" if spec.get("total_params") else "estimated",
         notes=str(spec.get("notes", "")),
     )
 
 
-def _from_hf_config(model_id: str, cfg: dict[str, Any]) -> ModelMetadata | None:
+def _from_hf_config(
+    model_id: str,
+    cfg: dict[str, Any],
+    *,
+    exact_total_params: int | None = None,
+) -> ModelMetadata | None:
     """Pull arch hints from a HF ``config.json`` payload."""
+
+    def first_int(*values: Any) -> int:
+        value = next((candidate for candidate in values if candidate is not None), None)
+        if value is None:
+            raise TypeError("missing required architecture field")
+        return int(value)
+
     try:
-        hidden = int(
-            cfg.get("hidden_size")
-            or cfg.get("n_embd")
-            or cfg.get("d_model")
+        hidden = first_int(
+            cfg.get("hidden_size"),
+            cfg.get("n_embd"),
+            cfg.get("d_model"),
         )
-        layers = int(
-            cfg.get("num_hidden_layers")
-            or cfg.get("n_layer")
-            or cfg.get("num_layers")
+        layers = first_int(
+            cfg.get("num_hidden_layers"),
+            cfg.get("n_layer"),
+            cfg.get("num_layers"),
         )
-        heads = int(
-            cfg.get("num_attention_heads")
-            or cfg.get("n_head")
-            or cfg.get("num_heads")
+        heads = first_int(
+            cfg.get("num_attention_heads"),
+            cfg.get("n_head"),
+            cfg.get("num_heads"),
         )
         kv = int(cfg.get("num_key_value_heads") or heads)
         ffn = int(
-            cfg.get("intermediate_size")
-            or cfg.get("ffn_dim")
-            or cfg.get("n_inner")
-            or 4 * hidden
+            cfg.get("intermediate_size") or cfg.get("ffn_dim") or cfg.get("n_inner") or 4 * hidden
         )
         vocab = int(cfg.get("vocab_size") or 32000)
     except (TypeError, ValueError) as e:
@@ -241,15 +252,38 @@ def _from_hf_config(model_id: str, cfg: dict[str, Any]) -> ModelMetadata | None:
         intermediate_size=ffn,
         vocab_size=vocab,
         tie_word_embeddings=bool(cfg.get("tie_word_embeddings", True)),
+        num_local_experts=max(
+            1,
+            int(
+                cfg.get("num_local_experts")
+                or cfg.get("num_experts")
+                or cfg.get("n_routed_experts")
+                or 1
+            ),
+        ),
+        num_experts_per_tok=max(
+            1,
+            int(
+                cfg.get("num_experts_per_tok")
+                or cfg.get("num_selected_experts")
+                or cfg.get("num_experts_per_token")
+                or 1
+            ),
+        ),
     )
-    total = int(_estimate_param_count(arch, family=family))
+    total = int(exact_total_params or _estimate_param_count(arch, family=family))
     return ModelMetadata(
         model_id=model_id,
         family=family,
         arch=arch,
         total_params=total,
         source="hf-config",
-        notes="param count estimated from arch; consult model card for exact value",
+        parameter_count_source="hub-safetensors" if exact_total_params else "estimated",
+        notes=(
+            "exact parameter count from Hub safetensors metadata"
+            if exact_total_params
+            else "parameter count estimated from architecture metadata"
+        ),
     )
 
 
@@ -271,7 +305,11 @@ def _estimate_param_count(arch: ArchHints, *, family: str = "llama") -> int:
     from .formulas import CLASSIC_MLP_FAMILIES
 
     ffn_matmuls = 2 if (family or "").lower() in CLASSIC_MLP_FAMILIES else 3
-    per_layer = 2 * h * h + 2 * h * kv_dim + ffn_matmuls * h * ff + 2 * h
+    experts = max(1, arch.num_local_experts)
+    per_layer = 2 * h * h + 2 * h * kv_dim + experts * ffn_matmuls * h * ff + 2 * h
+    if experts > 1:
+        # Router projection: hidden -> one logit per expert.
+        per_layer += h * experts
     # Input embedding, counted twice when lm_head is untied.
     embeds = vocab * h * (1 if arch.tie_word_embeddings else 2)
     final_norm = h
@@ -279,6 +317,7 @@ def _estimate_param_count(arch: ArchHints, *, family: str = "llama") -> int:
 
 
 _FAMILY_FROM_ID = [
+    (re.compile(r"mixtral", re.I), "mixtral"),
     (re.compile(r"qwen", re.I), "qwen2"),
     (re.compile(r"llama|tinyllama", re.I), "llama"),
     (re.compile(r"mistral", re.I), "mistral"),
@@ -300,6 +339,7 @@ def fetch_metadata(
     *,
     override: dict[str, Any] | None = None,
     use_network: bool = True,
+    revision: str = "main",
 ) -> ModelMetadata:
     """Resolve metadata for ``model_id``.
 
@@ -317,9 +357,10 @@ def fetch_metadata(
         return _from_spec(model_id, KNOWN_MODELS[model_id], source="known")
 
     if use_network:
-        cfg = fetch_model_config(model_id)
+        cfg = fetch_model_config(model_id, revision=revision)
         if cfg is not None:
-            md = _from_hf_config(model_id, cfg)
+            exact_total = fetch_model_parameter_count(model_id, revision=revision)
+            md = _from_hf_config(model_id, cfg, exact_total_params=exact_total)
             if md is not None:
                 return md
 

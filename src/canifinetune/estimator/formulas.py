@@ -31,7 +31,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from ..utils.units import dtype_bytes, quant_overhead
+from ..utils.units import dtype_bytes
 
 
 @dataclass(frozen=True)
@@ -47,6 +47,10 @@ class ArchHints:
     # Whether lm_head shares storage with the input embedding. Untied models
     # (Llama 3, Mistral, Qwen2.5-7B, ...) pay for the embedding matrix twice.
     tie_word_embeddings: bool = True
+    # Mixture-of-experts metadata. Dense models use one expert, so these
+    # defaults preserve the pre-0.3 behavior.
+    num_local_experts: int = 1
+    num_experts_per_tok: int = 1
 
 
 # Families whose MLP is a classic 2-matmul block (fc1 -> act -> fc2) rather
@@ -61,6 +65,7 @@ def _is_swiglu(family: str) -> bool:
 # ---------------------------------------------------------------------------
 # Weight memory
 # ---------------------------------------------------------------------------
+
 
 def embedding_params(arch: ArchHints) -> int:
     """Parameters stored at full precision in a k-bit quantized model: the
@@ -91,13 +96,12 @@ def weights_bytes(
     if quantization and quantization.lower() not in {"none", "fp16", "bf16", "fp32"}:
         q = quantization.lower()
         bytes_per_param = dtype_bytes(_quant_storage_dtype(q))
-        overhead = quant_overhead(q)
         if arch is None:
-            return num_params * (bytes_per_param + overhead)
+            return num_params * bytes_per_param
         full_precision = min(num_params, embedding_params(arch))
         linear = max(0, num_params - full_precision)
         fp_bytes = 4.0 if kbit_upcast_fp32 else dtype_bytes(base_dtype)
-        return linear * (bytes_per_param + overhead) + full_precision * fp_bytes
+        return linear * bytes_per_param + full_precision * fp_bytes
     return num_params * dtype_bytes(base_dtype)
 
 
@@ -125,6 +129,7 @@ def dequant_workspace_bytes(*, arch: ArchHints, quantization: str | None) -> flo
 # LoRA / QLoRA trainable parameter counting
 # ---------------------------------------------------------------------------
 
+
 def _lora_params_for_linear(in_dim: int, out_dim: int, rank: int) -> int:
     """LoRA parameters added by ``Linear[in,out]`` with rank ``rank``.
 
@@ -141,24 +146,39 @@ TARGET_MODULES_BY_FAMILY: dict[str, dict[str, list[str]]] = {
     "llama": {
         "attention": ["q_proj", "k_proj", "v_proj", "o_proj"],
         "all_linear": [
-            "q_proj", "k_proj", "v_proj", "o_proj",
-            "gate_proj", "up_proj", "down_proj",
+            "q_proj",
+            "k_proj",
+            "v_proj",
+            "o_proj",
+            "gate_proj",
+            "up_proj",
+            "down_proj",
         ],
         "conservative": ["q_proj", "v_proj"],
     },
     "qwen2": {
         "attention": ["q_proj", "k_proj", "v_proj", "o_proj"],
         "all_linear": [
-            "q_proj", "k_proj", "v_proj", "o_proj",
-            "gate_proj", "up_proj", "down_proj",
+            "q_proj",
+            "k_proj",
+            "v_proj",
+            "o_proj",
+            "gate_proj",
+            "up_proj",
+            "down_proj",
         ],
         "conservative": ["q_proj", "v_proj"],
     },
     "mistral": {
         "attention": ["q_proj", "k_proj", "v_proj", "o_proj"],
         "all_linear": [
-            "q_proj", "k_proj", "v_proj", "o_proj",
-            "gate_proj", "up_proj", "down_proj",
+            "q_proj",
+            "k_proj",
+            "v_proj",
+            "o_proj",
+            "gate_proj",
+            "up_proj",
+            "down_proj",
         ],
         "conservative": ["q_proj", "v_proj"],
     },
@@ -166,6 +186,11 @@ TARGET_MODULES_BY_FAMILY: dict[str, dict[str, list[str]]] = {
         "attention": ["q_proj", "k_proj", "v_proj", "dense"],
         "all_linear": ["q_proj", "k_proj", "v_proj", "dense", "fc1", "fc2"],
         "conservative": ["q_proj", "v_proj"],
+    },
+    "phi3": {
+        "attention": ["qkv_proj", "o_proj"],
+        "all_linear": ["qkv_proj", "o_proj", "gate_up_proj", "down_proj"],
+        "conservative": ["qkv_proj"],
     },
     "gpt2": {
         "attention": ["c_attn", "c_proj"],
@@ -175,18 +200,59 @@ TARGET_MODULES_BY_FAMILY: dict[str, dict[str, list[str]]] = {
     "gemma": {
         "attention": ["q_proj", "k_proj", "v_proj", "o_proj"],
         "all_linear": [
-            "q_proj", "k_proj", "v_proj", "o_proj",
-            "gate_proj", "up_proj", "down_proj",
+            "q_proj",
+            "k_proj",
+            "v_proj",
+            "o_proj",
+            "gate_proj",
+            "up_proj",
+            "down_proj",
         ],
+        "conservative": ["q_proj", "v_proj"],
+    },
+    "mixtral": {
+        "attention": ["q_proj", "k_proj", "v_proj", "o_proj"],
+        "all_linear": ["q_proj", "k_proj", "v_proj", "o_proj", "w1", "w2", "w3"],
         "conservative": ["q_proj", "v_proj"],
     },
 }
 
 
-def default_target_modules(family: str, scope: str = "attention") -> list[str]:
-    """Get default target_modules for a model family ('attention'/'all_linear'/'conservative')."""
+def _canonical_target_family(family: str) -> str:
     fam = (family or "").lower()
-    table = TARGET_MODULES_BY_FAMILY.get(fam) or TARGET_MODULES_BY_FAMILY["llama"]
+    if fam in TARGET_MODULES_BY_FAMILY:
+        return fam
+    if fam.startswith("qwen"):
+        return "qwen2"
+    if fam.startswith("llama"):
+        return "llama"
+    if fam.startswith("gemma"):
+        return "gemma"
+    if fam.startswith("phi3"):
+        return "phi3"
+    if fam.startswith("phi"):
+        return "phi"
+    if "mixtral" in fam:
+        return "mixtral"
+    return fam
+
+
+def default_target_modules(
+    family: str,
+    scope: str = "attention",
+    *,
+    strict: bool = False,
+) -> list[str]:
+    """Get default target_modules for a model family ('attention'/'all_linear'/'conservative')."""
+    fam = _canonical_target_family(family)
+    table = TARGET_MODULES_BY_FAMILY.get(fam)
+    if table is None:
+        if strict:
+            raise ValueError(
+                f"No verified LoRA target-module mapping for model family {family!r}. "
+                "Use a supported family or provide target modules explicitly."
+            )
+        table = TARGET_MODULES_BY_FAMILY["llama"]
     if scope not in table:
         scope = "attention"
     return list(table[scope])
@@ -215,14 +281,26 @@ def lora_trainable_params(
     targets = default_target_modules(family, scope=scope)
     per_layer = 0
     for name in targets:
-        if name in {"q_proj", "o_proj", "c_proj", "dense"}:
+        if name == "c_proj" and family.lower() == "gpt2":
+            # PEFT matches by module suffix. GPT-2 has both attn.c_proj
+            # (h -> h) and mlp.c_proj (ff -> h), so one target name attaches
+            # adapters to both modules.
             per_layer += _lora_params_for_linear(h, h, rank)
+            per_layer += _lora_params_for_linear(ff, h, rank)
+        elif name in {"q_proj", "o_proj", "c_proj", "dense"}:
+            per_layer += _lora_params_for_linear(h, h, rank)
+        elif name == "qkv_proj":
+            per_layer += _lora_params_for_linear(h, h + 2 * kv_dim, rank)
+        elif name == "gate_up_proj":
+            per_layer += arch.num_local_experts * _lora_params_for_linear(h, 2 * ff, rank)
         elif name in {"k_proj", "v_proj"}:
             per_layer += _lora_params_for_linear(h, kv_dim, rank)
-        elif name in {"gate_proj", "up_proj", "fc1"}:
-            per_layer += _lora_params_for_linear(h, ff, rank)
-        elif name in {"down_proj", "fc2"}:
-            per_layer += _lora_params_for_linear(ff, h, rank)
+        elif name in {"gate_proj", "up_proj", "fc1", "w1", "w3"}:
+            copies = arch.num_local_experts
+            per_layer += copies * _lora_params_for_linear(h, ff, rank)
+        elif name in {"down_proj", "fc2", "w2"}:
+            copies = arch.num_local_experts
+            per_layer += copies * _lora_params_for_linear(ff, h, rank)
         elif name == "c_attn":
             # GPT-2 fuses q,k,v into one Conv1D of shape (h, 3h).
             per_layer += _lora_params_for_linear(h, 3 * h, rank)
@@ -250,6 +328,7 @@ def adapter_weights_bytes(*, trainable_params: int) -> float:
 # ---------------------------------------------------------------------------
 # Gradients
 # ---------------------------------------------------------------------------
+
 
 def gradients_bytes(*, trainable_params: int, grad_dtype: str = "fp32") -> float:
     """Gradient buffer bytes. With LoRA, gradients exist only for adapters
@@ -342,6 +421,7 @@ def per_layer_activation_bytes(
         return s * b * 2.0 * h * act_bytes
 
     mlp_tensors = MLP_TENSORS_SWIGLU if _is_swiglu(family) else MLP_TENSORS_CLASSIC
+    mlp_tensors *= max(1, arch.num_experts_per_tok)
     mlp_scalar_bytes = 4.0 if quantized_base else act_bytes
 
     layer = s * b * (ATTN_SCALARS * h * act_bytes + mlp_tensors * ff * mlp_scalar_bytes)
@@ -369,27 +449,35 @@ def activations_bytes(
     recomputation peak of one full layer (recomputation happens one layer at a
     time during backward).
     """
-    kwargs = {
-        "seq_len": seq_len,
-        "batch_size": batch_size,
-        "arch": arch,
-        "activation_dtype": activation_dtype,
-        "attention_implementation": attention_implementation,
-        "family": family,
-        "quantized_base": quantized_base,
-    }
     per_layer = per_layer_activation_bytes(
-        use_gradient_checkpointing=use_gradient_checkpointing, **kwargs
+        seq_len=seq_len,
+        batch_size=batch_size,
+        arch=arch,
+        activation_dtype=activation_dtype,
+        use_gradient_checkpointing=use_gradient_checkpointing,
+        attention_implementation=attention_implementation,
+        family=family,
+        quantized_base=quantized_base,
     )
     total = per_layer * arch.num_hidden_layers
     if use_gradient_checkpointing:
-        total += per_layer_activation_bytes(use_gradient_checkpointing=False, **kwargs)
+        total += per_layer_activation_bytes(
+            seq_len=seq_len,
+            batch_size=batch_size,
+            arch=arch,
+            activation_dtype=activation_dtype,
+            use_gradient_checkpointing=False,
+            attention_implementation=attention_implementation,
+            family=family,
+            quantized_base=quantized_base,
+        )
     return total
 
 
 # ---------------------------------------------------------------------------
 # Logits / loss chain
 # ---------------------------------------------------------------------------
+
 
 def logits_loss_bytes(
     *,
@@ -417,6 +505,7 @@ def logits_loss_bytes(
 # ---------------------------------------------------------------------------
 # Misc buffers + safety margin
 # ---------------------------------------------------------------------------
+
 
 def cuda_overhead_bytes(*, available_vram_gb: float, overhead_fraction: float = 0.08) -> float:
     """Headroom for CUDA context, allocator fragmentation, and workspaces.

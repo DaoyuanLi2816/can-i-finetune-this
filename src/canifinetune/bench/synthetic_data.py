@@ -30,7 +30,7 @@ def make_batch(
     so the loss computation has something to chew on; for QLoRA we mask the
     pad token via the attention mask (no pad tokens here, all-ones mask).
     """
-    import torch  # type: ignore
+    import torch
 
     g = torch.Generator(device="cpu").manual_seed(seed)
     input_ids = torch.randint(
@@ -62,14 +62,12 @@ def make_text_dataset(num_rows: int, seq_len_chars: int = 256) -> list[dict[str,
             "with parameter-efficient methods like LoRA and QLoRA on consumer "
             "GPUs when memory is managed carefully."
         )
-        response = (
-            f"Sample {i}: open LLMs can be fine-tuned with LoRA/QLoRA on consumer GPUs."
-        )
+        response = f"Sample {i}: open LLMs can be fine-tuned with LoRA/QLoRA on consumer GPUs."
         rows.append(
             {
-                "instruction": instruction[: seq_len_chars],
-                "input": text[: seq_len_chars],
-                "output": response[: seq_len_chars],
+                "instruction": instruction[:seq_len_chars],
+                "input": text[:seq_len_chars],
+                "output": response[:seq_len_chars],
             }
         )
     return rows

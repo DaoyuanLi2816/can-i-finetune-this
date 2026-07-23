@@ -40,6 +40,7 @@ python eval_smoke.py --adapter output/adapter
 - Gradient checkpointing: **off**
 - Optimizer: **adamw_torch**
 - Attention impl: **eager**
+- Liger kernels: **off**
 
 Static feasibility on a 16.0 GB GPU: **yes**
 (confidence: medium).

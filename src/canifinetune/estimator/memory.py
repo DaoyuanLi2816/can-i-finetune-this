@@ -28,7 +28,7 @@ class EstimateRequest(BaseModel):
 
     base_dtype: str = "bf16"
     quantization: str = "nf4_double_quant"  # only used for qlora
-    lora_rank: int = 16
+    lora_rank: int = Field(16, gt=0)
     lora_target_scope: Literal["attention", "all_linear", "conservative"] = "attention"
 
     optimizer: str = "paged_adamw_8bit"
@@ -42,12 +42,19 @@ class EstimateRequest(BaseModel):
 
     # Optional override dict for unknown models (hidden_size, ...).
     override: dict[str, Any] | None = None
+    use_network: bool = True
+    revision: str = "main"
 
     @model_validator(mode="after")
     def _normalize_method(self) -> EstimateRequest:
         if self.method == "full":
             self.quantization = "none"
-        if self.method == "lora" and self.quantization.lower() not in {"none", "fp16", "bf16", "fp32"}:
+        if self.method == "lora" and self.quantization.lower() not in {
+            "none",
+            "fp16",
+            "bf16",
+            "fp32",
+        }:
             # LoRA on non-quantized base.
             self.quantization = "bf16"
         return self
@@ -153,8 +160,15 @@ def _compute_breakdown(req: EstimateRequest, md: ModelMetadata) -> MemoryBreakdo
     safety_b = F.safety_margin_bytes(available_vram_gb=req.gpu_vram_gb)
 
     total_b = (
-        weights_b + quant_overhead_b + adapter_b + grad_b + opt_b
-        + act_b + logits_b + cuda_b + safety_b
+        weights_b
+        + quant_overhead_b
+        + adapter_b
+        + grad_b
+        + opt_b
+        + act_b
+        + logits_b
+        + cuda_b
+        + safety_b
     )
 
     return MemoryBreakdown(
@@ -214,6 +228,17 @@ def _build_warnings(
     req: EstimateRequest, md: ModelMetadata, breakdown: MemoryBreakdown
 ) -> list[str]:
     warnings: list[str] = []
+    if md.arch.num_local_experts > 1:
+        warnings.append(
+            f"Mixture-of-experts model: {md.arch.num_local_experts} experts are stored and "
+            f"{md.arch.num_experts_per_tok} expert(s) are active per token. "
+            f"Parameter count source: {md.parameter_count_source}."
+        )
+    if md.parameter_count_source == "estimated":
+        warnings.append(
+            "Exact safetensors parameter metadata was unavailable; the total parameter "
+            "count was estimated from config.json."
+        )
     if req.seq_len >= 8192:
         warnings.append(
             "seq_len>=8192: activations dominate the estimate; static numbers are less reliable. "
@@ -233,10 +258,15 @@ def _build_warnings(
 
 
 def _choose_confidence(
-    req: EstimateRequest, breakdown: MemoryBreakdown, calibrated: bool
+    req: EstimateRequest,
+    md: ModelMetadata,
+    breakdown: MemoryBreakdown,
+    calibrated: bool,
 ) -> str:
     if calibrated:
         return "high"
+    if md.arch.num_local_experts > 1:
+        return "low"
     if req.seq_len <= 2048 and req.micro_batch_size <= 2:
         return "medium"
     return "low"
@@ -244,13 +274,37 @@ def _choose_confidence(
 
 def estimate(req: EstimateRequest) -> Estimate:
     """Static memory + feasibility estimate."""
-    md = fetch_metadata(req.model_id, override=req.override)
+    md = fetch_metadata(
+        req.model_id,
+        override=req.override,
+        use_network=req.use_network,
+        revision=req.revision,
+    )
     breakdown = _compute_breakdown(req, md)
-    breakdown = apply_calibration(breakdown, req.calibration)
+    calibration_applied = bool(
+        req.calibration
+        and req.calibration.is_compatible(
+            model_family=md.family,
+            method=req.method,
+            gpu_vram_gb=req.gpu_vram_gb,
+        )
+    )
+    breakdown = apply_calibration(
+        breakdown,
+        req.calibration,
+        model_family=md.family,
+        method=req.method,
+        gpu_vram_gb=req.gpu_vram_gb,
+    )
     feasibility, ratio = _classify_feasibility(
         total_gb=breakdown.total_estimated_gb, gpu_vram_gb=req.gpu_vram_gb
     )
-    confidence = _choose_confidence(req, breakdown, calibrated=req.calibration is not None)
+    confidence = _choose_confidence(
+        req,
+        md,
+        breakdown,
+        calibrated=calibration_applied,
+    )
     assumptions = _build_assumptions(req, md)
     warnings = _build_warnings(req, md, breakdown)
 
@@ -262,6 +316,7 @@ def estimate(req: EstimateRequest) -> Estimate:
             "total_params": md.total_params,
             "arch": asdict(md.arch),
             "source": md.source,
+            "parameter_count_source": md.parameter_count_source,
             "notes": md.notes,
         },
         memory=breakdown,
@@ -270,5 +325,5 @@ def estimate(req: EstimateRequest) -> Estimate:
         confidence=confidence,
         assumptions=assumptions,
         warnings=warnings,
-        calibration_applied=req.calibration is not None,
+        calibration_applied=calibration_applied,
     )

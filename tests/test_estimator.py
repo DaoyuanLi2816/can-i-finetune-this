@@ -7,6 +7,7 @@ import math
 import pytest
 
 from canifinetune.estimator.formulas import (
+    ArchHints,
     activations_bytes,
     gradients_bytes,
     lora_trainable_params,
@@ -33,9 +34,9 @@ def test_weights_bytes_nf4_double_quant_smaller_than_fp16():
     assert q < raw / 3  # ~0.51 B/param vs 2 B/param
 
 
-def test_weights_bytes_int8_is_close_to_one_byte_plus_overhead():
+def test_weights_bytes_int8_excludes_separately_reported_metadata_overhead():
     b = weights_bytes(num_params=1_000_000, base_dtype="bf16", quantization="int8")
-    assert 1.1 * 1e6 <= b <= 1.3 * 1e6
+    assert b == 1_000_000
 
 
 def test_lora_trainable_params_grows_with_rank(arch_qwen_1p5b):
@@ -48,6 +49,47 @@ def test_lora_trainable_params_all_linear_is_bigger_than_attention(arch_qwen_1p5
     attn = lora_trainable_params(arch=arch_qwen_1p5b, family="qwen2", rank=16, scope="attention")
     full = lora_trainable_params(arch=arch_qwen_1p5b, family="qwen2", rank=16, scope="all_linear")
     assert full > attn
+
+
+def test_gpt2_suffix_matching_counts_both_c_proj_modules():
+    arch = ArchHints(
+        hidden_size=2,
+        num_hidden_layers=2,
+        num_attention_heads=2,
+        num_key_value_heads=2,
+        intermediate_size=8,
+        vocab_size=50257,
+    )
+    assert (
+        lora_trainable_params(
+            arch=arch,
+            family="gpt2",
+            rank=8,
+            scope="attention",
+        )
+        == 352
+    )
+
+
+def test_moe_all_linear_lora_counts_every_expert():
+    dense = ArchHints(
+        hidden_size=64,
+        num_hidden_layers=2,
+        num_attention_heads=4,
+        num_key_value_heads=2,
+        intermediate_size=128,
+        vocab_size=1000,
+    )
+    moe = ArchHints(
+        **{
+            **dense.__dict__,
+            "num_local_experts": 8,
+            "num_experts_per_tok": 2,
+        }
+    )
+    dense_params = lora_trainable_params(arch=dense, family="mixtral", rank=8, scope="all_linear")
+    moe_params = lora_trainable_params(arch=moe, family="mixtral", rank=8, scope="all_linear")
+    assert moe_params > dense_params * 4
 
 
 def test_gradients_only_for_trainable():
@@ -165,6 +207,15 @@ def test_estimate_unknown_model_with_override():
     )
     assert est.feasible == "yes"
     assert est.metadata["model_id"] == "unknown-org/unknown-model-9000B"
+
+
+def test_estimate_rejects_non_positive_lora_rank():
+    with pytest.raises(ValueError):
+        EstimateRequest(
+            model_id="Qwen/Qwen2.5-1.5B-Instruct",
+            gpu_vram_gb=16,
+            lora_rank=0,
+        )
 
 
 def test_estimate_total_is_sum_of_components():

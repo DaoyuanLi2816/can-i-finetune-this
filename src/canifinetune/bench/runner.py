@@ -39,7 +39,7 @@ class BenchConfig(BaseModel):
     steps: int = Field(2, gt=0)
     lora_rank: int = Field(8, gt=0)
     lora_alpha: int = Field(16, gt=0)
-    lora_dropout: float = 0.0
+    lora_dropout: float = Field(0.0, ge=0.0, lt=1.0)
     lora_target_scope: Literal["attention", "all_linear", "conservative"] = "attention"
     optimizer: str = "paged_adamw_8bit"
     quantization: str = "nf4_double_quant"
@@ -66,6 +66,7 @@ class BenchResult(BaseModel):
     oom: dict[str, Any] = Field(default_factory=lambda: OomReport().to_dict())
     measured: dict[str, Any] = Field(default_factory=dict)
     estimated_total_gb: float = 0.0
+    estimated_breakdown: dict[str, Any] = Field(default_factory=dict)
     notes: list[str] = Field(default_factory=list)
     success: bool = True
     method: str = "lora"
@@ -83,11 +84,15 @@ def _safe_clear() -> None:
 
 
 def _make_lora_config(cfg: BenchConfig, family: str) -> Any:
-    from peft import LoraConfig  # type: ignore
+    from peft import LoraConfig
 
     from ..estimator.formulas import default_target_modules
 
-    target_modules = default_target_modules(family, scope=cfg.lora_target_scope)
+    target_modules = default_target_modules(
+        family,
+        scope=cfg.lora_target_scope,
+        strict=True,
+    )
     return LoraConfig(
         r=cfg.lora_rank,
         lora_alpha=cfg.lora_alpha,
@@ -99,22 +104,22 @@ def _make_lora_config(cfg: BenchConfig, family: str) -> Any:
 
 
 def _build_optimizer(params, name: str):
-    import torch  # type: ignore
+    import torch
 
     name = name.lower()
     if name in {"paged_adamw_8bit", "adamw_8bit"}:
         try:
-            import bitsandbytes as bnb  # type: ignore
+            import bitsandbytes as bnb
 
-            return bnb.optim.PagedAdamW8bit(params, lr=2e-4)
+            cls = bnb.optim.PagedAdamW8bit if name == "paged_adamw_8bit" else bnb.optim.AdamW8bit
+            return cls(params, lr=2e-4)
         except Exception as e:
-            log.warning("bitsandbytes 8-bit optimizer unavailable (%s); falling back to AdamW", e)
-            return torch.optim.AdamW(params, lr=2e-4)
+            raise RuntimeError(f"{name} requires a working bitsandbytes installation") from e
     if name in {"adamw_torch", "adamw_torch_fused", "adamw"}:
         return torch.optim.AdamW(params, lr=2e-4)
     if name == "sgd":
         return torch.optim.SGD(params, lr=1e-3)
-    return torch.optim.AdamW(params, lr=2e-4)
+    raise ValueError(f"Unsupported optimizer {name!r}")
 
 
 def _model_dtype_kwarg(value: Any) -> dict[str, Any]:
@@ -127,8 +132,8 @@ def _model_dtype_kwarg(value: Any) -> dict[str, Any]:
 
 
 def _build_model(cfg: BenchConfig):
-    import torch  # type: ignore
-    from transformers import AutoConfig, AutoModelForCausalLM  # type: ignore
+    import torch
+    from transformers import AutoConfig, AutoModelForCausalLM
 
     kwargs: dict[str, Any] = {"trust_remote_code": False}
 
@@ -145,11 +150,9 @@ def _build_model(cfg: BenchConfig):
 
     if cfg.method == "qlora":
         try:
-            from transformers import BitsAndBytesConfig  # type: ignore
+            from transformers import BitsAndBytesConfig
 
-            compute_dtype = (
-                torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
-            )
+            compute_dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
             kwargs["quantization_config"] = BitsAndBytesConfig(
                 load_in_4bit=True,
                 bnb_4bit_compute_dtype=compute_dtype,
@@ -158,7 +161,9 @@ def _build_model(cfg: BenchConfig):
             )
             kwargs.update(_model_dtype_kwarg(compute_dtype))
         except Exception as e:
-            log.warning("BitsAndBytesConfig unavailable (%s); falling back to LoRA without 4-bit.", e)
+            raise RuntimeError(
+                "QLoRA requires transformers.BitsAndBytesConfig and bitsandbytes"
+            ) from e
 
     if cfg.attention_implementation in {"sdpa", "flash_attention_2", "eager"}:
         kwargs["attn_implementation"] = cfg.attention_implementation
@@ -192,14 +197,14 @@ def _build_model(cfg: BenchConfig):
     # For QLoRA we need to prepare the model for 4-bit fine-tuning.
     if cfg.method == "qlora":
         try:
-            from peft import prepare_model_for_kbit_training  # type: ignore
+            from peft import prepare_model_for_kbit_training
 
             model = prepare_model_for_kbit_training(
                 model,
                 use_gradient_checkpointing=cfg.gradient_checkpointing,
             )
         except Exception as e:
-            log.warning("prepare_model_for_kbit_training failed: %s", e)
+            raise RuntimeError("prepare_model_for_kbit_training failed") from e
 
     if cfg.gradient_checkpointing and not getattr(model, "is_gradient_checkpointing", False):
         try:
@@ -214,7 +219,7 @@ def _build_model(cfg: BenchConfig):
 def _attach_lora(model, cfg: BenchConfig, family: str):
     if cfg.method == "full":
         return model
-    from peft import get_peft_model  # type: ignore
+    from peft import get_peft_model
 
     lora_cfg = _make_lora_config(cfg, family)
     return get_peft_model(model, lora_cfg)
@@ -223,12 +228,14 @@ def _attach_lora(model, cfg: BenchConfig, family: str):
 def _torch_env() -> dict[str, Any]:
     out: dict[str, Any] = {}
     try:
-        import torch  # type: ignore
+        import torch
 
         out["torch_version"] = torch.__version__
         out["cuda_version"] = getattr(torch.version, "cuda", "") or ""
         out["cudnn_version"] = getattr(torch.backends.cudnn, "version", lambda: "")()
-        out["bf16_supported"] = bool(torch.cuda.is_bf16_supported()) if torch.cuda.is_available() else False
+        out["bf16_supported"] = (
+            bool(torch.cuda.is_bf16_supported()) if torch.cuda.is_available() else False
+        )
     except Exception:
         out["torch_version"] = "not installed"
     return out
@@ -261,6 +268,26 @@ def _build_estimate_total(cfg: BenchConfig, gpu_total_gb: float) -> float:
     return estimate(req).memory.total_estimated_gb
 
 
+def _build_estimate_breakdown(cfg: BenchConfig, gpu_total_gb: float) -> dict[str, Any]:
+    if gpu_total_gb <= 0.0:
+        return {}
+    req = EstimateRequest(
+        model_id=cfg.model_id,
+        method=cfg.method,
+        gpu_vram_gb=gpu_total_gb,
+        seq_len=cfg.seq_len,
+        micro_batch_size=cfg.micro_batch_size,
+        base_dtype=cfg.base_dtype,
+        quantization=cfg.quantization if cfg.method == "qlora" else "bf16",
+        lora_rank=cfg.lora_rank,
+        lora_target_scope=cfg.lora_target_scope,
+        optimizer=cfg.optimizer,
+        gradient_checkpointing=cfg.gradient_checkpointing,
+        attention_implementation=cfg.attention_implementation,
+    )
+    return estimate(req).memory.model_dump()
+
+
 def run_bench(cfg: BenchConfig) -> BenchResult:
     """Run the benchmark and return a fully populated :class:`BenchResult`."""
     snapshots: list[MemorySnapshot] = []
@@ -272,13 +299,14 @@ def run_bench(cfg: BenchConfig) -> BenchResult:
     # Pre-compute the static estimate for the same config so the result file
     # is directly usable by ``canifinetune calibrate``.
     estimated_total = 0.0
+    estimated_breakdown: dict[str, Any] = {}
     try:
         md = fetch_metadata(cfg.model_id)
         family = md.family
         if cfg.record_estimate:
-            estimated_total = _build_estimate_total(
-                cfg, gpu_total_gb=float(gpu.get("total_vram_gb") or 0.0)
-            )
+            gpu_total_gb = float(gpu.get("total_vram_gb") or 0.0)
+            estimated_breakdown = _build_estimate_breakdown(cfg, gpu_total_gb)
+            estimated_total = float(estimated_breakdown.get("total_estimated_gb") or 0.0)
     except Exception as e:
         notes.append(f"Could not resolve model metadata in advance: {e}")
         family = "unknown"
@@ -292,12 +320,13 @@ def run_bench(cfg: BenchConfig) -> BenchResult:
         snapshots=[],
         oom=OomReport().to_dict(),
         estimated_total_gb=estimated_total,
+        estimated_breakdown=estimated_breakdown,
         notes=notes,
         method=cfg.method,
     )
 
     try:
-        import torch  # type: ignore
+        import torch
     except Exception as e:
         result.success = False
         result.notes.append(f"torch not importable: {e}")
@@ -314,7 +343,7 @@ def run_bench(cfg: BenchConfig) -> BenchResult:
 
     try:
         model, hf_cfg = _build_model(cfg)
-    except BaseException as e:
+    except Exception as e:
         if is_oom(e):
             result.oom = make_oom_report("model_load", e).to_dict()
         result.success = False
@@ -329,22 +358,24 @@ def run_bench(cfg: BenchConfig) -> BenchResult:
 
     try:
         model = _attach_lora(model, cfg, family)
-    except BaseException as e:
+    except Exception as e:
         result.success = False
         result.notes.append(f"LoRA attach failed: {type(e).__name__}: {e}")
         result.snapshots = [s.to_dict() for s in snapshots]
         return result
     snapshots.append(snapshot("after_lora_attach"))
 
-    try:
-        trainable = [p for p in model.parameters() if p.requires_grad]
-        optimizer = _build_optimizer(trainable, cfg.optimizer)
-    except BaseException as e:
-        result.success = False
-        result.notes.append(f"optimizer init failed: {type(e).__name__}: {e}")
-        result.snapshots = [s.to_dict() for s in snapshots]
-        return result
-    snapshots.append(snapshot("after_optimizer_init"))
+    optimizer = None
+    if not cfg.forward_only:
+        try:
+            trainable = [p for p in model.parameters() if p.requires_grad]
+            optimizer = _build_optimizer(trainable, cfg.optimizer)
+        except Exception as e:
+            result.success = False
+            result.notes.append(f"optimizer init failed: {type(e).__name__}: {e}")
+            result.snapshots = [s.to_dict() for s in snapshots]
+            return result
+        snapshots.append(snapshot("after_optimizer_init"))
 
     model.train()
     vocab_size = int(getattr(hf_cfg, "vocab_size", 32000))
@@ -362,10 +393,11 @@ def run_bench(cfg: BenchConfig) -> BenchResult:
                 device=cfg.device,
                 seed=step,
             )
-        except BaseException as e:
+        except Exception as e:
             if is_oom(e):
                 result.oom = make_oom_report("make_batch", e).to_dict()
             result.notes.append(f"batch generation failed at step {step}: {e}")
+            result.success = False
             break
 
         t0 = time.perf_counter()
@@ -383,6 +415,7 @@ def run_bench(cfg: BenchConfig) -> BenchResult:
                 loss.backward()
                 if step == 0:
                     snapshots.append(snapshot("after_first_backward"))
+                assert optimizer is not None
                 optimizer.step()
                 optimizer.zero_grad(set_to_none=True)
                 if step == 0:
@@ -391,7 +424,7 @@ def run_bench(cfg: BenchConfig) -> BenchResult:
             dt = time.perf_counter() - t0
             step_times.append(dt)
             total_tokens += cfg.micro_batch_size * cfg.seq_len
-        except BaseException as e:
+        except Exception as e:
             stage = "forward" if step == 0 else f"step_{step}"
             if is_oom(e):
                 result.oom = make_oom_report(stage, e).to_dict()

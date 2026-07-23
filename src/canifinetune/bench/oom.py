@@ -21,7 +21,7 @@ def is_oom(exc: BaseException) -> bool:
     if "out of memory" in msg or "cuda oom" in msg:
         return True
     try:
-        import torch  # type: ignore
+        import torch
 
         if isinstance(exc, torch.cuda.OutOfMemoryError):
             return True

@@ -39,9 +39,10 @@ calibration = fit(measurements → estimates)
 estimate(req, calibration=...) = adjust(base_estimate, calibration)
 ```
 
-For now this is a single multiplicative correction on the activations term
-(the noisiest one). With enough samples, this can be split per (GPU, model
-family, seq_len) bucket.
+Schema-v2 calibration leaves deterministic static memory untouched. It fits
+the dynamic residual against `max_memory_allocated`, fits allocator overhead
+from the reserved-minus-allocated gap, and only applies to compatible model
+families, methods, and GPU-memory sizes.
 
 ## Recipes
 
@@ -55,6 +56,8 @@ no DeepSpeed, no Trainer subclasses — easier to read, easier to debug.
 - **New model families**: add an entry to `KNOWN_MODELS` in `estimator/model_metadata.py`,
   and a `target_modules` block in `estimator/formulas.py` if PEFT's defaults
   don't match.
+- **MoE families**: map their expert-count config keys and target-module names;
+  exact total parameters are normally read from Hub safetensors metadata.
 - **New optimizers**: add a row to `OPTIMIZER_BYTES_PER_PARAM` in `estimator/formulas.py`.
 - **New quantization schemes**: add to `QUANT_OVERHEAD_BYTES_PER_PARAM` in `utils/units.py`,
   then handle the storage-dtype mapping in `_quant_storage_dtype` (`estimator/formulas.py`).

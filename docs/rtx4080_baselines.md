@@ -28,16 +28,16 @@ to sit slightly *above* the measured peak.
 | model | method | seq_len | batch | ckpt | est. GB | **measured peak (reserved) GB** | tok/sec | OOM |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `Qwen/Qwen2.5-0.5B-Instruct` | qlora | 1024 | 1 | on | 5.01 | **3.30** | 3337 | no |
-| `Qwen/Qwen2.5-0.5B-Instruct` | qlora | 2048 | 1 | on | 7.22 | **6.28** | 3445 | no |
+| `Qwen/Qwen2.5-0.5B-Instruct` | qlora | 2048 | 1 | on | 7.21 | **6.28** | 3445 | no |
 | `Qwen/Qwen2.5-0.5B-Instruct` | lora (bf16) | 1024 | 1 | on | 5.19 | **3.79** | 3762 | no |
-| `Qwen/Qwen2.5-1.5B-Instruct` | qlora | 512 | 1 | on | 4.88 | **2.91** | 1498 | no |
-| `Qwen/Qwen2.5-1.5B-Instruct` | qlora | 1024 | 1 | on | 6.07 | **4.36** | 2483 | no |
-| `Qwen/Qwen2.5-1.5B-Instruct` | qlora | 2048 | 1 | on | 8.44 | **7.10** | 2327 | no |
-| `Qwen/Qwen2.5-1.5B-Instruct` | qlora | 4096 | 1 | on | 13.19 | **13.56** | 1662 | no |
-| `Qwen/Qwen2.5-1.5B-Instruct` | qlora | 1024 | 2 | on | 8.44 | **6.88** | 2662 | no |
-| `Qwen/Qwen2.5-1.5B-Instruct` | qlora | 1024 | 1 | **off** | 10.77 | **9.55** | 3003 | no |
-| `Qwen/Qwen2.5-3B-Instruct` | qlora | 1024 | 1 | on | 7.31 | **5.54** | 1303 | no |
-| `Qwen/Qwen2.5-7B-Instruct` | qlora | 1024 | 1 | on | 12.54 | **11.23** | 923 | no |
+| `Qwen/Qwen2.5-1.5B-Instruct` | qlora | 512 | 1 | on | 4.86 | **2.91** | 1498 | no |
+| `Qwen/Qwen2.5-1.5B-Instruct` | qlora | 1024 | 1 | on | 6.05 | **4.36** | 2483 | no |
+| `Qwen/Qwen2.5-1.5B-Instruct` | qlora | 2048 | 1 | on | 8.42 | **7.10** | 2327 | no |
+| `Qwen/Qwen2.5-1.5B-Instruct` | qlora | 4096 | 1 | on | 13.16 | **13.56** | 1662 | no |
+| `Qwen/Qwen2.5-1.5B-Instruct` | qlora | 1024 | 2 | on | 8.42 | **6.88** | 2662 | no |
+| `Qwen/Qwen2.5-1.5B-Instruct` | qlora | 1024 | 1 | **off** | 10.75 | **9.55** | 3003 | no |
+| `Qwen/Qwen2.5-3B-Instruct` | qlora | 1024 | 1 | on | 7.26 | **5.54** | 1303 | no |
+| `Qwen/Qwen2.5-7B-Instruct` | qlora | 1024 | 1 | on | 12.43 | **11.23** | 923 | no |
 | `sshleifer/tiny-gpt2` (smoke) | lora | 128 | 1 | on | 2.16 | **0.14** | 1470 | no |
 
 Comparing the estimator's *real components* (total minus the headroom terms)
@@ -58,18 +58,18 @@ Worth reading off the table directly:
   buys ~20% throughput. On a 16 GB card it is usually the wrong trade above
   seq 1024.
 - **7B QLoRA fits a 16 GB card at seq 1024** (11.23 GB measured) but does
-  *not* fit a 12 GB card — and the estimator now says exactly that (12.54
+  *not* fit a 12 GB card — and the estimator now says exactly that (12.43
   estimated → `no` at 12 GB, `yes` at 16 GB).
 
 ## Calibration
 
 Running `canifinetune calibrate --benchmarks benchmarks/results` on the
-results above fits a single multiplicative correction from 11 samples
-(smoke-scale runs are excluded automatically). The mean measured/estimated
-ratio is **0.80×** — i.e. the static estimate with its headroom sits ~20%
-above the reserved-memory peak on this machine, on the conservative side.
-Applying `--use-calibration` tightens estimates toward measured reality;
-leaving it off keeps the extra guard band.
+results above fits component-aware corrections from 11 samples (smoke-scale
+runs are excluded automatically). The v2 calibration leaves static weights
+and the policy safety margin untouched, fits dynamic memory against
+`max_memory_allocated` (**1.04×** here), and separately fits the allocator gap
+between allocated and reserved memory (**0.285×**). Calibration is only
+applied to compatible model families, methods, and GPU-memory sizes.
 
 The static estimator alone was 0.5–3.9× off (both directions) before the
 logits-chain and fp32-upcast terms were added in 0.2.0; calibration existed

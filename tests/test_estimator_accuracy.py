@@ -44,8 +44,10 @@ def _real_components_gb(est) -> float:
 @pytest.mark.parametrize(
     "model_id,method,seq_len,batch,ckpt,measured_gb",
     MEASURED_RTX4080,
-    ids=[f"{m.split('/')[-1]}-{meth}-s{s}-b{b}-{'ckpt' if c else 'nockpt'}"
-         for m, meth, s, b, c, _ in MEASURED_RTX4080],
+    ids=[
+        f"{m.split('/')[-1]}-{meth}-s{s}-b{b}-{'ckpt' if c else 'nockpt'}"
+        for m, meth, s, b, c, _ in MEASURED_RTX4080
+    ],
 )
 def test_estimate_tracks_measured_peak(model_id, method, seq_len, batch, ckpt, measured_gb):
     est = estimate(
@@ -69,6 +71,7 @@ def test_estimate_tracks_measured_peak(model_id, method, seq_len, batch, ckpt, m
 def test_seq_len_slope_matches_measurement():
     """Doubling seq_len roughly doubles the dynamic memory (logits dominate);
     measured 4.04 -> 6.53 -> 11.51 GiB for 1024/2048/4096 on Qwen2.5-1.5B."""
+
     def real(seq):
         est = estimate(
             EstimateRequest(
@@ -90,6 +93,7 @@ def test_seq_len_slope_matches_measurement():
 def test_batch_and_seq_are_interchangeable():
     """b=2,s=1024 measured within 0.1 GiB of b=1,s=2048 — the estimator
     should agree instead of charging batch differently from sequence."""
+
     def real(seq, batch):
         est = estimate(
             EstimateRequest(
@@ -138,7 +142,10 @@ def test_untied_lm_head_costs_a_second_embedding():
 
 def test_logits_term_scales_with_vocab():
     base = {
-        "method": "qlora", "gpu_vram_gb": 16.0, "seq_len": 1024, "micro_batch_size": 1,
+        "method": "qlora",
+        "gpu_vram_gb": 16.0,
+        "seq_len": 1024,
+        "micro_batch_size": 1,
         "override": {
             "family": "llama",
             "hidden_size": 1024,
@@ -149,12 +156,18 @@ def test_logits_term_scales_with_vocab():
             "total_params": 500_000_000,
         },
     }
-    small = estimate(EstimateRequest(
-        model_id="x/small-vocab", **{**base, "override": {**base["override"], "vocab_size": 32_000}}
-    ))
-    large = estimate(EstimateRequest(
-        model_id="x/large-vocab", **{**base, "override": {**base["override"], "vocab_size": 152_064}}
-    ))
+    small = estimate(
+        EstimateRequest(
+            model_id="x/small-vocab",
+            **{**base, "override": {**base["override"], "vocab_size": 32_000}},
+        )
+    )
+    large = estimate(
+        EstimateRequest(
+            model_id="x/large-vocab",
+            **{**base, "override": {**base["override"], "vocab_size": 152_064}},
+        )
+    )
     assert large.memory.logits_gb == pytest.approx(
         small.memory.logits_gb * 152_064 / 32_000, rel=0.01
     )

@@ -81,7 +81,7 @@ def _md_to_html(markdown_text: str) -> str:
 def _wrap_document(title: str, body: str) -> str:
     return (
         "<!DOCTYPE html>\n"
-        f"<html><head><meta charset=\"utf-8\"><title>{escape(title)}</title>"
+        f'<html><head><meta charset="utf-8"><title>{escape(title)}</title>'
         f"<style>{_BASE_CSS}</style></head><body>\n"
         f"{body}\n</body></html>\n"
     )

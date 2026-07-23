@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "canifinetune"
-version = "0.2.0"
+dynamic = ["version"]
 description = "Estimate, benchmark, and generate fine-tuning recipes for LLMs on consumer GPUs."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -33,6 +33,8 @@ classifiers = [
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
   "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 
@@ -81,10 +83,14 @@ Repository = "https://github.com/DaoyuanLi2816/can-i-finetune-this"
 [tool.hatch.build.targets.wheel]
 packages = ["src/canifinetune"]
 
+[tool.hatch.version]
+path = "src/canifinetune/__init__.py"
+
 [tool.hatch.build.targets.sdist]
 include = [
   "src/canifinetune",
   "README.md",
+  "CHANGELOG.md",
   "LICENSE",
   "pyproject.toml",
 ]
@@ -118,6 +124,7 @@ markers = [
 ]
 
 [tool.mypy]
+plugins = ["pydantic.mypy"]
 python_version = "3.10"
 strict = false
 ignore_missing_imports = true

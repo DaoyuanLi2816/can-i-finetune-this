@@ -29,7 +29,11 @@ def _write_fake_result(path: Path, *, model: str, seq: int, oom: bool) -> Path:
         "env": {"torch_version": "2.4.1+cu121", "cuda_version": "12.1", "bf16_supported": True},
         "gpu": {"name": "NVIDIA GeForce RTX 4080", "total_vram_gb": 16.0, "free_vram_gb": 14.5},
         "snapshots": [],
-        "oom": {"happened": oom, "stage": "forward" if oom else "", "message": "fake" if oom else ""},
+        "oom": {
+            "happened": oom,
+            "stage": "forward" if oom else "",
+            "message": "fake" if oom else "",
+        },
         "measured": {
             "peak_reserved_gb": 5.2,
             "peak_allocated_gb": 4.7,
@@ -48,7 +52,9 @@ def _write_fake_result(path: Path, *, model: str, seq: int, oom: bool) -> Path:
 
 
 def test_report_md_contains_each_result(tmp_path: Path):
-    a = _write_fake_result(tmp_path / "a.json", model="Qwen/Qwen2.5-1.5B-Instruct", seq=1024, oom=False)
+    a = _write_fake_result(
+        tmp_path / "a.json", model="Qwen/Qwen2.5-1.5B-Instruct", seq=1024, oom=False
+    )
     b = _write_fake_result(tmp_path / "b.json", model="Qwen/Qwen2.5-3B-Instruct", seq=512, oom=True)
     md = render_report_markdown([a, b])
     assert "Qwen2.5-1.5B-Instruct" in md
@@ -57,18 +63,22 @@ def test_report_md_contains_each_result(tmp_path: Path):
 
 
 def test_compare_md_table_rows_match_inputs(tmp_path: Path):
-    a = _write_fake_result(tmp_path / "a.json", model="Qwen/Qwen2.5-1.5B-Instruct", seq=1024, oom=False)
+    a = _write_fake_result(
+        tmp_path / "a.json", model="Qwen/Qwen2.5-1.5B-Instruct", seq=1024, oom=False
+    )
     b = _write_fake_result(tmp_path / "b.json", model="Qwen/Qwen2.5-3B-Instruct", seq=512, oom=True)
     md = render_compare_markdown([a, b])
     # Two data rows + 2 header rows = 4 lines starting with '|'
     pipe_rows = [line for line in md.splitlines() if line.startswith("|")]
     assert len(pipe_rows) >= 4
     assert any("yes" in r for r in pipe_rows)  # OOM column for b
-    assert any("no" in r for r in pipe_rows)   # OOM column for a
+    assert any("no" in r for r in pipe_rows)  # OOM column for a
 
 
 def test_html_renders_some_html_tags(tmp_path: Path):
-    a = _write_fake_result(tmp_path / "a.json", model="Qwen/Qwen2.5-1.5B-Instruct", seq=1024, oom=False)
+    a = _write_fake_result(
+        tmp_path / "a.json", model="Qwen/Qwen2.5-1.5B-Instruct", seq=1024, oom=False
+    )
     html = render_report_html([a])
     assert "<html" in html.lower()
     assert "<h1>" in html

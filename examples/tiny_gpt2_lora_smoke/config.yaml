@@ -19,6 +19,7 @@ seed: 42
 
 gradient_checkpointing: false
 attention_implementation: "eager"
+use_liger_kernel: false
 
 # Mixed precision
 base_dtype: "fp32"

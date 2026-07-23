@@ -9,18 +9,14 @@ from canifinetune.estimator.recommender import (
 
 
 def test_recommend_returns_feasible_configs():
-    recs = recommend_configs(
-        model_id="Qwen/Qwen2.5-1.5B-Instruct", gpu_vram_gb=16.0, top_k=5
-    )
+    recs = recommend_configs(model_id="Qwen/Qwen2.5-1.5B-Instruct", gpu_vram_gb=16.0, top_k=5)
     assert recs, "expected at least one feasible config"
     assert all(isinstance(r, RecommendedConfig) for r in recs)
     assert all(r.estimate.feasible in {"yes", "marginal"} for r in recs)
 
 
 def test_recommend_prefers_longer_seq_first():
-    recs = recommend_configs(
-        model_id="Qwen/Qwen2.5-1.5B-Instruct", gpu_vram_gb=16.0, top_k=3
-    )
+    recs = recommend_configs(model_id="Qwen/Qwen2.5-1.5B-Instruct", gpu_vram_gb=16.0, top_k=3)
     seq_lens = [r.estimate.request.seq_len for r in recs]
     # The first one should not be smaller than the last in the returned ordering.
     assert seq_lens[0] >= seq_lens[-1]

@@ -124,8 +124,21 @@
     "final_reserved_gb": 11.2324,
     "loss_last_step": 13.600935935974121
   },
-  "estimated_total_gb": 12.537,
+  "estimated_total_gb": 12.4336,
   "notes": [],
   "success": true,
-  "method": "qlora"
+  "method": "qlora",
+  "estimated_breakdown": {
+    "static_model_gb": 7.1375,
+    "quantization_overhead_gb": 0.3562,
+    "trainable_params_mb": 10.093,
+    "gradients_gb": 0.0376,
+    "optimizer_gb": 0.0235,
+    "activations_gb": 0.7695,
+    "logits_gb": 2.0303,
+    "cuda_overhead_gb": 1.2794,
+    "safety_margin_gb": 0.7996,
+    "total_estimated_gb": 12.4336
+  },
+  "estimator_version": "0.3.0"
 }

@@ -51,7 +51,7 @@ What `canifinetune estimate` actually prints:
 +--------------------------------+
 | Component             |  Value |
 |-----------------------+--------|
-| static model          |  1.517 |
+| static model          |  1.496 |
 | quantization overhead |  0.072 |
 | trainable params      | 4.4 MB |
 | gradients             |  0.016 |
@@ -60,7 +60,7 @@ What `canifinetune estimate` actually prints:
 | logits / loss         |  4.057 |
 | CUDA / fragmentation  |  1.280 |
 | safety margin         |  0.800 |
-| total                 |  8.441 |
+| total                 |  8.420 |
 +--------------------------------+
 ```
 
@@ -162,6 +162,8 @@ This project tries to answer the harder question. It models:
 - A fragmentation / CUDA / buffer safety margin
 - A feasibility decision against your actual GPU
 - Concrete degradation suggestions when not feasible
+- Exact Hub safetensors parameter counts and MoE-aware weight/activation
+  accounting (`num_local_experts` vs `num_experts_per_tok`)
 
 Estimates are **always** marked with an `assumptions` block and a `confidence`
 level, because activation memory in particular is hard to predict statically.
@@ -183,12 +185,12 @@ Highlights (more in the doc):
 | model | method | seq_len | estimated | measured peak | tok/sec |
 | --- | --- | --- | --- | --- | --- |
 | `Qwen/Qwen2.5-0.5B-Instruct` | qlora | 1024 | 5.01 GB | 3.30 GB | 3337 |
-| `Qwen/Qwen2.5-1.5B-Instruct` | qlora | 1024 | 6.07 GB | 4.36 GB | 2483 |
-| `Qwen/Qwen2.5-1.5B-Instruct` | qlora | 2048 | 8.44 GB | 7.10 GB | 2327 |
-| `Qwen/Qwen2.5-1.5B-Instruct` | qlora | 4096 | 13.19 GB | 13.56 GB | 1662 |
-| `Qwen/Qwen2.5-1.5B-Instruct` | qlora (no ckpt) | 1024 | 10.77 GB | 9.55 GB | 3003 |
-| `Qwen/Qwen2.5-3B-Instruct` | qlora | 1024 | 7.31 GB | 5.54 GB | 1303 |
-| `Qwen/Qwen2.5-7B-Instruct` | qlora | 1024 | 12.54 GB | 11.23 GB | 923 |
+| `Qwen/Qwen2.5-1.5B-Instruct` | qlora | 1024 | 6.05 GB | 4.36 GB | 2483 |
+| `Qwen/Qwen2.5-1.5B-Instruct` | qlora | 2048 | 8.42 GB | 7.10 GB | 2327 |
+| `Qwen/Qwen2.5-1.5B-Instruct` | qlora | 4096 | 13.16 GB | 13.56 GB | 1662 |
+| `Qwen/Qwen2.5-1.5B-Instruct` | qlora (no ckpt) | 1024 | 10.75 GB | 9.55 GB | 3003 |
+| `Qwen/Qwen2.5-3B-Instruct` | qlora | 1024 | 7.26 GB | 5.54 GB | 1303 |
+| `Qwen/Qwen2.5-7B-Instruct` | qlora | 1024 | 12.43 GB | 11.23 GB | 923 |
 
 ---
 
@@ -217,7 +219,13 @@ Hugging Face stack". Possible directions, none committed:
 - Auto-tuning of `gradient_accumulation_steps` for a target effective batch size
 - A web UI on top of the CLI
 
+Generated recipes can opt into current TRL Liger kernels with `--liger`; the
+static estimate remains conservative and continues to model the stock
+logits/loss path.
+
 Contributions welcome.
+
+See [CHANGELOG.md](CHANGELOG.md) for release notes.
 
 ---
 

@@ -21,8 +21,10 @@ from .utils.logging import get_logger, to_json
 # — reconfigure both streams to UTF-8 up front so every table/panel below
 # renders correctly regardless of the OS locale.
 for _stream in (sys.stdout, sys.stderr):
-    with contextlib.suppress(AttributeError, ValueError):
-        _stream.reconfigure(encoding="utf-8")
+    _reconfigure = getattr(_stream, "reconfigure", None)
+    if callable(_reconfigure):
+        with contextlib.suppress(ValueError):
+            _reconfigure(encoding="utf-8")
 
 console = Console()
 err_console = Console(stderr=True)
@@ -46,8 +48,12 @@ def _print_version_and_exit(value: bool) -> None:
 @app.callback()
 def _root(
     version: bool | None = typer.Option(
-        None, "--version", "-V", help="Print version and exit.",
-        callback=_print_version_and_exit, is_eager=True,
+        None,
+        "--version",
+        "-V",
+        help="Print version and exit.",
+        callback=_print_version_and_exit,
+        is_eager=True,
     ),
 ) -> None:
     """canifinetune root callback."""
@@ -57,6 +63,7 @@ def _root(
 # ---------------------------------------------------------------------------
 # doctor
 # ---------------------------------------------------------------------------
+
 
 @app.command("doctor")
 def cmd_doctor(
@@ -75,9 +82,14 @@ def cmd_doctor(
     table.add_column("Value", style="cyan")
     table.add_row("Python", f"{report.python['version']} ({report.python['implementation']})")
     table.add_row("Executable", report.python["executable"])
-    table.add_row("Platform", f"{report.host.get('platform','?')} {report.host.get('platform_release','')}")
+    table.add_row(
+        "Platform", f"{report.host.get('platform', '?')} {report.host.get('platform_release', '')}"
+    )
     cuda = report.cuda
-    table.add_row("Torch", f"{cuda.get('torch_version','-')} (CUDA available: {cuda.get('torch_cuda_available')})")
+    table.add_row(
+        "Torch",
+        f"{cuda.get('torch_version', '-')} (CUDA available: {cuda.get('torch_cuda_available')})",
+    )
     table.add_row("Torch CUDA", cuda.get("torch_cuda_version", "-"))
     for g in cuda.get("gpus", []):
         table.add_row(
@@ -119,23 +131,32 @@ def cmd_doctor(
 # estimate
 # ---------------------------------------------------------------------------
 
+
 @app.command("estimate")
 def cmd_estimate(
     model: str = typer.Option(..., "--model", help="HF model id, e.g. Qwen/Qwen2.5-1.5B-Instruct"),
-    gpu_vram_gb: float = typer.Option(..., "--gpu-vram-gb", help="GPU VRAM in GiB (e.g. 16 for an RTX 4080)."),
+    gpu_vram_gb: float = typer.Option(
+        ..., "--gpu-vram-gb", min=0.001, help="GPU VRAM in GiB (e.g. 16 for an RTX 4080)."
+    ),
     method: str = typer.Option("qlora", "--method", help="full | lora | qlora"),
-    seq_len: int = typer.Option(2048, "--seq-len"),
-    micro_batch_size: int = typer.Option(1, "--micro-batch-size"),
-    lora_rank: int = typer.Option(16, "--lora-rank"),
-    lora_target_scope: str = typer.Option("attention", "--target-scope", help="attention | all_linear | conservative"),
+    seq_len: int = typer.Option(2048, "--seq-len", min=1),
+    micro_batch_size: int = typer.Option(1, "--micro-batch-size", min=1),
+    lora_rank: int = typer.Option(16, "--lora-rank", min=1),
+    lora_target_scope: str = typer.Option(
+        "attention", "--target-scope", help="attention | all_linear | conservative"
+    ),
     quantization: str = typer.Option("nf4_double_quant", "--quantization"),
     base_dtype: str = typer.Option("bf16", "--base-dtype"),
     optimizer: str = typer.Option("paged_adamw_8bit", "--optimizer"),
-    gradient_checkpointing: bool = typer.Option(True, "--gradient-checkpointing/--no-gradient-checkpointing"),
+    gradient_checkpointing: bool = typer.Option(
+        True, "--gradient-checkpointing/--no-gradient-checkpointing"
+    ),
     attention_implementation: str = typer.Option("sdpa", "--attn"),
     use_calibration: bool = typer.Option(False, "--use-calibration"),
     calibration_path: Path | None = typer.Option(None, "--calibration-path"),
-    override_json: Path | None = typer.Option(None, "--override-json", help="Path to JSON with arch override."),
+    override_json: Path | None = typer.Option(
+        None, "--override-json", help="Path to JSON with arch override."
+    ),
     json_out: bool = typer.Option(False, "--json"),
 ) -> None:
     """Static memory + feasibility estimate."""
@@ -213,7 +234,9 @@ def _print_estimate(est) -> None:
     if est.assumptions:
         console.print(Panel.fit("\n".join(f"- {a}" for a in est.assumptions), title="Assumptions"))
     if est.warnings:
-        console.print(Panel.fit("\n".join(f"- {w}" for w in est.warnings), title="Warnings", style="yellow"))
+        console.print(
+            Panel.fit("\n".join(f"- {w}" for w in est.warnings), title="Warnings", style="yellow")
+        )
 
     if est.feasible != "yes":
         from .estimator.recommender import suggest_degradations
@@ -238,11 +261,12 @@ def _print_estimate(est) -> None:
 # recommend
 # ---------------------------------------------------------------------------
 
+
 @app.command("recommend")
 def cmd_recommend(
     model: str = typer.Option(..., "--model"),
-    gpu_vram_gb: float = typer.Option(..., "--gpu-vram-gb"),
-    top_k: int = typer.Option(5, "--top-k"),
+    gpu_vram_gb: float = typer.Option(..., "--gpu-vram-gb", min=0.001),
+    top_k: int = typer.Option(5, "--top-k", min=1),
     json_out: bool = typer.Option(False, "--json"),
     override_json: Path | None = typer.Option(None, "--override-json"),
 ) -> None:
@@ -269,7 +293,9 @@ def cmd_recommend(
         console.print("[red]No feasible configurations found in the search grid.[/red]")
         return
 
-    table = Table(title=f"Top {len(recs)} configurations for {model} on {gpu_vram_gb} GB", show_lines=False)
+    table = Table(
+        title=f"Top {len(recs)} configurations for {model} on {gpu_vram_gb} GB", show_lines=False
+    )
     table.add_column("#")
     table.add_column("method")
     table.add_column("seq")
@@ -303,19 +329,22 @@ def cmd_recommend(
 # bench
 # ---------------------------------------------------------------------------
 
+
 @app.command("bench")
 def cmd_bench(
     model: str = typer.Option(..., "--model"),
     method: str = typer.Option("lora", "--method", help="full | lora | qlora"),
-    seq_len: int = typer.Option(128, "--seq-len"),
-    micro_batch_size: int = typer.Option(1, "--micro-batch-size"),
-    steps: int = typer.Option(2, "--steps"),
-    lora_rank: int = typer.Option(8, "--lora-rank"),
+    seq_len: int = typer.Option(128, "--seq-len", min=1),
+    micro_batch_size: int = typer.Option(1, "--micro-batch-size", min=1),
+    steps: int = typer.Option(2, "--steps", min=1),
+    lora_rank: int = typer.Option(8, "--lora-rank", min=1),
     lora_target_scope: str = typer.Option("attention", "--target-scope"),
     quantization: str = typer.Option("nf4_double_quant", "--quantization"),
     base_dtype: str = typer.Option("bf16", "--base-dtype"),
     optimizer: str = typer.Option("paged_adamw_8bit", "--optimizer"),
-    gradient_checkpointing: bool = typer.Option(True, "--gradient-checkpointing/--no-gradient-checkpointing"),
+    gradient_checkpointing: bool = typer.Option(
+        True, "--gradient-checkpointing/--no-gradient-checkpointing"
+    ),
     attention_implementation: str = typer.Option("sdpa", "--attn"),
     forward_only: bool = typer.Option(False, "--forward-only"),
     out_dir: Path = typer.Option(Path("benchmarks/results"), "--out-dir"),
@@ -348,6 +377,8 @@ def cmd_bench(
         print(to_json(result.model_dump()))
     else:
         _print_bench_summary(result, path)
+    if not result.success or (result.oom or {}).get("happened"):
+        raise typer.Exit(1)
 
 
 def _print_bench_summary(result, path: Path) -> None:
@@ -360,8 +391,8 @@ def _print_bench_summary(result, path: Path) -> None:
             f"file: {path}\n"
             f"model: {result.config.model_id} ({result.model_family})\n"
             f"method: {result.method}  seq_len: {result.config.seq_len}  bs: {result.config.micro_batch_size}\n"
-            f"peak reserved: {measured.get('peak_reserved_gb','-')} GB  "
-            f"peak allocated: {measured.get('peak_allocated_gb','-')} GB\n"
+            f"peak reserved: {measured.get('peak_reserved_gb', '-')} GB  "
+            f"peak allocated: {measured.get('peak_allocated_gb', '-')} GB\n"
             f"estimated total: {result.estimated_total_gb:.2f} GB\n"
             f"avg step: {result.avg_step_time_s} s  tokens/sec: {result.tokens_per_second}",
             title="bench",
@@ -382,6 +413,7 @@ def _print_bench_summary(result, path: Path) -> None:
 # ---------------------------------------------------------------------------
 # calibrate
 # ---------------------------------------------------------------------------
+
 
 @app.command("calibrate")
 def cmd_calibrate(
@@ -424,24 +456,35 @@ def cmd_calibrate(
 # recipe
 # ---------------------------------------------------------------------------
 
+
 @app.command("recipe")
 def cmd_recipe(
     model: str = typer.Option(..., "--model"),
     method: str = typer.Option("qlora", "--method"),
-    seq_len: int = typer.Option(2048, "--seq-len"),
-    micro_batch_size: int = typer.Option(1, "--micro-batch-size"),
-    grad_accum: int = typer.Option(8, "--grad-accum"),
-    lora_rank: int = typer.Option(16, "--lora-rank"),
+    seq_len: int = typer.Option(2048, "--seq-len", min=1),
+    micro_batch_size: int = typer.Option(1, "--micro-batch-size", min=1),
+    grad_accum: int = typer.Option(8, "--grad-accum", min=1),
+    lora_rank: int = typer.Option(16, "--lora-rank", min=1),
     lora_target_scope: str = typer.Option("attention", "--target-scope"),
     learning_rate: float = typer.Option(2e-4, "--lr"),
-    max_steps: int = typer.Option(50, "--max-steps"),
+    max_steps: int = typer.Option(50, "--max-steps", min=1),
     optimizer: str = typer.Option("paged_adamw_8bit", "--optimizer"),
     quantization: str = typer.Option("nf4_double_quant", "--quantization"),
     base_dtype: str = typer.Option("bf16", "--base-dtype"),
-    gradient_checkpointing: bool = typer.Option(True, "--gradient-checkpointing/--no-gradient-checkpointing"),
+    gradient_checkpointing: bool = typer.Option(
+        True, "--gradient-checkpointing/--no-gradient-checkpointing"
+    ),
     attention_implementation: str = typer.Option("sdpa", "--attn"),
-    gpu_vram_gb: float = typer.Option(16.0, "--gpu-vram-gb"),
+    use_liger_kernel: bool = typer.Option(
+        False,
+        "--liger/--no-liger",
+        help="Use Liger kernels in generated TRL recipes.",
+    ),
+    gpu_vram_gb: float = typer.Option(16.0, "--gpu-vram-gb", min=0.001),
     output: Path = typer.Option(..., "--output"),
+    force: bool = typer.Option(
+        False, "--force", help="Overwrite files in a non-empty output directory."
+    ),
 ) -> None:
     """Generate a self-contained training recipe folder."""
     from .recipes import RecipeRequest, generate_recipe
@@ -461,10 +504,16 @@ def cmd_recipe(
         base_dtype=base_dtype,
         gradient_checkpointing=gradient_checkpointing,
         attention_implementation=attention_implementation,
+        use_liger_kernel=use_liger_kernel,
         gpu_vram_gb=gpu_vram_gb,
         output_dir=output,
+        overwrite=force,
     )
-    res = generate_recipe(req)
+    try:
+        res = generate_recipe(req)
+    except FileExistsError as e:
+        err_console.print(f"[red]error:[/red] {e}")
+        raise typer.Exit(2)
     console.print(
         Panel.fit(
             "\n".join(f"- {p}" for p in res.files),
@@ -477,6 +526,7 @@ def cmd_recipe(
 # ---------------------------------------------------------------------------
 # report
 # ---------------------------------------------------------------------------
+
 
 @app.command("report")
 def cmd_report(
@@ -499,6 +549,7 @@ def cmd_report(
 # ---------------------------------------------------------------------------
 # compare
 # ---------------------------------------------------------------------------
+
 
 @app.command("compare")
 def cmd_compare(

@@ -1,4 +1,5 @@
 {
+  "schema_version": 2,
   "samples": [
     {
       "gpu_name": "NVIDIA GeForce RTX 4080",
@@ -9,7 +10,13 @@
       "seq_len": 1024,
       "micro_batch_size": 1,
       "estimated_total_gb": 5.188,
-      "measured_total_gb": 3.7949
+      "measured_total_gb": 3.7949,
+      "gpu_vram_gb": 15.992,
+      "estimated_static_gb": 0.9414,
+      "estimated_dynamic_gb": 2.1677999999999997,
+      "estimated_cuda_overhead_gb": 1.2794,
+      "measured_allocated_gb": 3.0324,
+      "measured_reserved_gb": 3.7949
     },
     {
       "gpu_name": "NVIDIA GeForce RTX 4080",
@@ -19,8 +26,14 @@
       "method": "qlora",
       "seq_len": 1024,
       "micro_batch_size": 1,
-      "estimated_total_gb": 5.0111,
-      "measured_total_gb": 3.3027
+      "estimated_total_gb": 5.0054,
+      "measured_total_gb": 3.3027,
+      "gpu_vram_gb": 15.992,
+      "estimated_static_gb": 0.7170000000000001,
+      "estimated_dynamic_gb": 2.2095,
+      "estimated_cuda_overhead_gb": 1.2794,
+      "measured_allocated_gb": 3.1158,
+      "measured_reserved_gb": 3.3027
     },
     {
       "gpu_name": "NVIDIA GeForce RTX 4080",
@@ -30,8 +43,14 @@
       "method": "qlora",
       "seq_len": 2048,
       "micro_batch_size": 1,
-      "estimated_total_gb": 7.2206,
-      "measured_total_gb": 6.2812
+      "estimated_total_gb": 7.2149,
+      "measured_total_gb": 6.2812,
+      "gpu_vram_gb": 15.992,
+      "estimated_static_gb": 0.7170000000000001,
+      "estimated_dynamic_gb": 4.4189,
+      "estimated_cuda_overhead_gb": 1.2794,
+      "measured_allocated_gb": 5.522,
+      "measured_reserved_gb": 6.2812
     },
     {
       "gpu_name": "NVIDIA GeForce RTX 4080",
@@ -41,8 +60,14 @@
       "method": "qlora",
       "seq_len": 1024,
       "micro_batch_size": 1,
-      "estimated_total_gb": 6.067,
-      "measured_total_gb": 4.3574
+      "estimated_total_gb": 6.0462,
+      "measured_total_gb": 4.3574,
+      "gpu_vram_gb": 15.992,
+      "estimated_static_gb": 1.5944,
+      "estimated_dynamic_gb": 2.3728,
+      "estimated_cuda_overhead_gb": 1.2794,
+      "measured_allocated_gb": 4.0413,
+      "measured_reserved_gb": 4.3574
     },
     {
       "gpu_name": "NVIDIA GeForce RTX 4080",
@@ -52,8 +77,14 @@
       "method": "qlora",
       "seq_len": 1024,
       "micro_batch_size": 1,
-      "estimated_total_gb": 10.7677,
-      "measured_total_gb": 9.5527
+      "estimated_total_gb": 10.7469,
+      "measured_total_gb": 9.5527,
+      "gpu_vram_gb": 15.992,
+      "estimated_static_gb": 1.5944,
+      "estimated_dynamic_gb": 7.0735,
+      "estimated_cuda_overhead_gb": 1.2794,
+      "measured_allocated_gb": 9.3413,
+      "measured_reserved_gb": 9.5527
     },
     {
       "gpu_name": "NVIDIA GeForce RTX 4080",
@@ -63,8 +94,14 @@
       "method": "qlora",
       "seq_len": 1024,
       "micro_batch_size": 2,
-      "estimated_total_gb": 8.4398,
-      "measured_total_gb": 6.8809
+      "estimated_total_gb": 8.419,
+      "measured_total_gb": 6.8809,
+      "gpu_vram_gb": 15.992,
+      "estimated_static_gb": 1.5944,
+      "estimated_dynamic_gb": 4.7456000000000005,
+      "estimated_cuda_overhead_gb": 1.2794,
+      "measured_allocated_gb": 6.5311,
+      "measured_reserved_gb": 6.8809
     },
     {
       "gpu_name": "NVIDIA GeForce RTX 4080",
@@ -74,8 +111,14 @@
       "method": "qlora",
       "seq_len": 2048,
       "micro_batch_size": 1,
-      "estimated_total_gb": 8.4398,
-      "measured_total_gb": 7.0977
+      "estimated_total_gb": 8.419,
+      "measured_total_gb": 7.0977,
+      "gpu_vram_gb": 15.992,
+      "estimated_static_gb": 1.5944,
+      "estimated_dynamic_gb": 4.7456000000000005,
+      "estimated_cuda_overhead_gb": 1.2794,
+      "measured_allocated_gb": 6.5324,
+      "measured_reserved_gb": 7.0977
     },
     {
       "gpu_name": "NVIDIA GeForce RTX 4080",
@@ -85,8 +128,14 @@
       "method": "qlora",
       "seq_len": 4096,
       "micro_batch_size": 1,
-      "estimated_total_gb": 13.1854,
-      "measured_total_gb": 13.5566
+      "estimated_total_gb": 13.1646,
+      "measured_total_gb": 13.5566,
+      "gpu_vram_gb": 15.992,
+      "estimated_static_gb": 1.5944,
+      "estimated_dynamic_gb": 9.4913,
+      "estimated_cuda_overhead_gb": 1.2794,
+      "measured_allocated_gb": 11.5068,
+      "measured_reserved_gb": 13.5566
     },
     {
       "gpu_name": "NVIDIA GeForce RTX 4080",
@@ -96,8 +145,14 @@
       "method": "qlora",
       "seq_len": 512,
       "micro_batch_size": 1,
-      "estimated_total_gb": 4.8806,
-      "measured_total_gb": 2.9062
+      "estimated_total_gb": 4.8598,
+      "measured_total_gb": 2.9062,
+      "gpu_vram_gb": 15.992,
+      "estimated_static_gb": 1.5944,
+      "estimated_dynamic_gb": 1.1864,
+      "estimated_cuda_overhead_gb": 1.2794,
+      "measured_allocated_gb": 2.7943,
+      "measured_reserved_gb": 2.9062
     },
     {
       "gpu_name": "NVIDIA GeForce RTX 4080",
@@ -107,8 +162,14 @@
       "method": "qlora",
       "seq_len": 1024,
       "micro_batch_size": 1,
-      "estimated_total_gb": 7.3086,
-      "measured_total_gb": 5.5371
+      "estimated_total_gb": 7.2647,
+      "measured_total_gb": 5.5371,
+      "gpu_vram_gb": 15.992,
+      "estimated_static_gb": 2.6518,
+      "estimated_dynamic_gb": 2.534,
+      "estimated_cuda_overhead_gb": 1.2794,
+      "measured_allocated_gb": 5.1719,
+      "measured_reserved_gb": 5.5371
     },
     {
       "gpu_name": "NVIDIA GeForce RTX 4080",
@@ -118,12 +179,26 @@
       "method": "qlora",
       "seq_len": 1024,
       "micro_batch_size": 1,
-      "estimated_total_gb": 12.537,
-      "measured_total_gb": 11.2324
+      "estimated_total_gb": 12.4336,
+      "measured_total_gb": 11.2324,
+      "gpu_vram_gb": 15.992,
+      "estimated_static_gb": 7.5548,
+      "estimated_dynamic_gb": 2.7998,
+      "estimated_cuda_overhead_gb": 1.2794,
+      "measured_allocated_gb": 10.0023,
+      "measured_reserved_gb": 11.2324
     }
   ],
-  "activation_scale": 0.7999333540723071,
-  "weights_scale": 0.7999333540723071,
-  "overhead_scale": 0.7999333540723071,
-  "note": "Fit from 11 sample(s); mean measured/estimated ratio = 0.800. Applied uniformly to weights + activations + CUDA overhead; safety_margin left untouched."
+  "activation_scale": 1.0402688806473364,
+  "weights_scale": 1.0,
+  "overhead_scale": 0.28544630295450973,
+  "model_families": [
+    "qwen2"
+  ],
+  "methods": [
+    "lora",
+    "qlora"
+  ],
+  "gpu_vram_gb": 15.992,
+  "note": "Fit from 11 sample(s); median dynamic scale = 1.040, allocator-overhead scale = 0.285. Static memory and safety margin are not scaled."
 }

@@ -1,9 +1,7 @@
 name: Release to PyPI
 
 # Publishes to PyPI when a GitHub release is published.
-# Uses PyPI trusted publishing (no token stored in the repo):
-# https://docs.pypi.org/trusted-publishers/ — register this repo + workflow
-# under the canifinetune project on PyPI once.
+# Uses PyPI trusted publishing (no token stored in the repository).
 
 on:
   release:
@@ -21,8 +19,26 @@ jobs:
         with:
           python-version: "3.12"
       - run: |
+          python -m pip install --upgrade pip
           python -m pip install build
-          python -m build
+          python -m pip install -e ".[dev,report]"
+      - name: Verify release tag matches package version
+        shell: bash
+        run: |
+          package_version="$(python -c 'import canifinetune; print(canifinetune.__version__)')"
+          tag_version="${GITHUB_REF_NAME#v}"
+          test "$package_version" = "$tag_version" || {
+            echo "release tag $GITHUB_REF_NAME does not match package version $package_version"
+            exit 1
+          }
+      - name: Verify source
+        run: |
+          ruff check .
+          ruff format --check .
+          mypy src
+          pytest -q
+      - name: Build distributions
+        run: python -m build
       - uses: actions/upload-artifact@v4
         with:
           name: dist

@@ -117,7 +117,7 @@ Each section below corresponds to one benchmark result JSON. `estimated` is what
 
 | Metric | Value |
 | --- | --- |
-| estimated total | 7.22 GB |
+| estimated total | 7.21 GB |
 | measured peak (reserved) | 6.28 GB |
 | measured peak (allocated) | 5.52 GB |
 | final allocated | 1.88 GB |
@@ -158,7 +158,7 @@ Each section below corresponds to one benchmark result JSON. `estimated` is what
 
 | Metric | Value |
 | --- | --- |
-| estimated total | 6.07 GB |
+| estimated total | 6.05 GB |
 | measured peak (reserved) | 4.36 GB |
 | measured peak (allocated) | 4.04 GB |
 | final allocated | 2.14 GB |
@@ -199,7 +199,7 @@ Each section below corresponds to one benchmark result JSON. `estimated` is what
 
 | Metric | Value |
 | --- | --- |
-| estimated total | 10.77 GB |
+| estimated total | 10.75 GB |
 | measured peak (reserved) | 9.55 GB |
 | measured peak (allocated) | 9.34 GB |
 | final allocated | 2.18 GB |
@@ -240,7 +240,7 @@ Each section below corresponds to one benchmark result JSON. `estimated` is what
 
 | Metric | Value |
 | --- | --- |
-| estimated total | 8.44 GB |
+| estimated total | 8.42 GB |
 | measured peak (reserved) | 6.88 GB |
 | measured peak (allocated) | 6.53 GB |
 | final allocated | 2.73 GB |
@@ -281,7 +281,7 @@ Each section below corresponds to one benchmark result JSON. `estimated` is what
 
 | Metric | Value |
 | --- | --- |
-| estimated total | 8.44 GB |
+| estimated total | 8.42 GB |
 | measured peak (reserved) | 7.10 GB |
 | measured peak (allocated) | 6.53 GB |
 | final allocated | 2.74 GB |
@@ -322,7 +322,7 @@ Each section below corresponds to one benchmark result JSON. `estimated` is what
 
 | Metric | Value |
 | --- | --- |
-| estimated total | 13.19 GB |
+| estimated total | 13.16 GB |
 | measured peak (reserved) | 13.56 GB |
 | measured peak (allocated) | 11.51 GB |
 | final allocated | 3.92 GB |
@@ -363,7 +363,7 @@ Each section below corresponds to one benchmark result JSON. `estimated` is what
 
 | Metric | Value |
 | --- | --- |
-| estimated total | 4.88 GB |
+| estimated total | 4.86 GB |
 | measured peak (reserved) | 2.91 GB |
 | measured peak (allocated) | 2.79 GB |
 | final allocated | 1.85 GB |
@@ -404,7 +404,7 @@ Each section below corresponds to one benchmark result JSON. `estimated` is what
 
 | Metric | Value |
 | --- | --- |
-| estimated total | 7.31 GB |
+| estimated total | 7.26 GB |
 | measured peak (reserved) | 5.54 GB |
 | measured peak (allocated) | 5.17 GB |
 | final allocated | 3.16 GB |
@@ -445,7 +445,7 @@ Each section below corresponds to one benchmark result JSON. `estimated` is what
 
 | Metric | Value |
 | --- | --- |
-| estimated total | 12.54 GB |
+| estimated total | 12.43 GB |
 | measured peak (reserved) | 11.23 GB |
 | measured peak (allocated) | 10.00 GB |
 | final allocated | 7.89 GB |

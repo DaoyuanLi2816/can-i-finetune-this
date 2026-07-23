@@ -85,9 +85,7 @@ def dtype_bytes(dtype: str) -> float:
     """Bytes per scalar for ``dtype`` (e.g. ``"bf16"`` → 2.0)."""
     key = dtype.lower()
     if key not in DTYPE_BYTES_PER_PARAM:
-        raise ValueError(
-            f"Unknown dtype {dtype!r}. Known: {sorted(DTYPE_BYTES_PER_PARAM)}"
-        )
+        raise ValueError(f"Unknown dtype {dtype!r}. Known: {sorted(DTYPE_BYTES_PER_PARAM)}")
     return DTYPE_BYTES_PER_PARAM[key]
 
 

@@ -40,6 +40,7 @@ python eval_smoke.py --adapter output/adapter
 - Gradient checkpointing: **{{ "on" if gradient_checkpointing else "off" }}**
 - Optimizer: **{{ optimizer }}**
 - Attention impl: **{{ attention_implementation }}**
+- Liger kernels: **{{ "on" if use_liger_kernel else "off" }}**
 
 Static feasibility on a {{ gpu_vram_gb }} GB GPU: **{{ estimate_feasible }}**
 (confidence: {{ estimate_confidence }}).

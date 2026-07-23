@@ -77,6 +77,20 @@ def test_recipe_train_script_compiles(tmp_path: Path):
     compile(src, str(out / "train.py"), "exec")
 
 
+def test_recipe_resolves_data_and_output_relative_to_config(tmp_path: Path):
+    out = tmp_path / "recipe"
+    generate_recipe(
+        RecipeRequest(
+            model_id="sshleifer/tiny-gpt2",
+            method="lora",
+            output_dir=out,
+        )
+    )
+    train = (out / "train.py").read_text(encoding="utf-8")
+    assert 'for field_name in ("dataset_path", "output_dir")' in train
+    assert "config_path.parent / value" in train
+
+
 def test_recipe_includes_target_modules_for_family(tmp_path: Path):
     out = tmp_path / "recipe"
     req = RecipeRequest(
@@ -94,3 +108,21 @@ def test_recipe_includes_target_modules_for_family(tmp_path: Path):
     cfg = yaml.safe_load((out / "config.yaml").read_text(encoding="utf-8"))
     # Llama family should expose q/k/v/o linear projections.
     assert {"q_proj", "k_proj", "v_proj", "o_proj"}.issubset(set(cfg["target_modules"]))
+
+
+def test_recipe_can_enable_liger_kernels(tmp_path: Path):
+    out = tmp_path / "recipe"
+    generate_recipe(
+        RecipeRequest(
+            model_id="Qwen/Qwen2.5-1.5B-Instruct",
+            output_dir=out,
+            use_liger_kernel=True,
+        )
+    )
+
+    requirements = (out / "requirements.txt").read_text(encoding="utf-8")
+    config = (out / "config.yaml").read_text(encoding="utf-8")
+    train = (out / "train.py").read_text(encoding="utf-8")
+    assert "liger-kernel>=0.5" in requirements
+    assert "use_liger_kernel: true" in config
+    assert 'sft_kwargs["use_liger_kernel"]' in train

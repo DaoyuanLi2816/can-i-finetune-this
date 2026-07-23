@@ -19,6 +19,7 @@ seed: 42
 
 gradient_checkpointing: true
 attention_implementation: "sdpa"
+use_liger_kernel: false
 
 # Mixed precision
 base_dtype: "bf16"

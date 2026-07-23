@@ -31,18 +31,20 @@ class RecipeRequest(BaseModel):
     gradient_accumulation_steps: int = Field(8, gt=0)
     lora_rank: int = Field(16, gt=0)
     lora_alpha: int = Field(32, gt=0)
-    lora_dropout: float = 0.05
+    lora_dropout: float = Field(0.05, ge=0.0, lt=1.0)
     lora_target_scope: Literal["attention", "all_linear", "conservative"] = "attention"
     base_dtype: str = "bf16"
     quantization: str = "nf4_double_quant"
     optimizer: str = "paged_adamw_8bit"
     gradient_checkpointing: bool = True
     attention_implementation: str = "sdpa"
+    use_liger_kernel: bool = False
     learning_rate: float = 2e-4
     max_steps: int = 50
     output_dir: Path = Field(..., description="Where to write the recipe folder.")
-    gpu_vram_gb: float = 16.0
+    gpu_vram_gb: float = Field(16.0, gt=0.0)
     project_name: str = "canifinetune-recipe"
+    overwrite: bool = False
 
 
 @dataclass
@@ -66,7 +68,11 @@ def _render(env: Environment, template: str, ctx: dict) -> str:
 
 def _build_context(req: RecipeRequest) -> dict:
     md = fetch_metadata(req.model_id)
-    target_modules = default_target_modules(md.family, scope=req.lora_target_scope)
+    target_modules = default_target_modules(
+        md.family,
+        scope=req.lora_target_scope,
+        strict=True,
+    )
 
     # Pre-compute the static estimate so the recipe's README shows it.
     er = EstimateRequest(
@@ -102,6 +108,7 @@ def _build_context(req: RecipeRequest) -> dict:
         "optimizer": req.optimizer,
         "gradient_checkpointing": req.gradient_checkpointing,
         "attention_implementation": req.attention_implementation,
+        "use_liger_kernel": req.use_liger_kernel,
         "learning_rate": req.learning_rate,
         "max_steps": req.max_steps,
         "project_name": req.project_name,
@@ -114,13 +121,16 @@ def _build_context(req: RecipeRequest) -> dict:
         "estimate_feasible": est.feasible,
         "estimate_confidence": est.confidence,
         "uses_4bit": req.method == "qlora",
-        "extra_deps": (
-            ["bitsandbytes>=0.43"]
-            if req.method == "qlora"
-            or "8bit" in req.optimizer
-            or req.optimizer.startswith("paged")
-            else []
-        ),
+        "extra_deps": [
+            *(
+                ["bitsandbytes>=0.43"]
+                if req.method == "qlora"
+                or "8bit" in req.optimizer
+                or req.optimizer.startswith("paged")
+                else []
+            ),
+            *(["liger-kernel>=0.5"] if req.use_liger_kernel else []),
+        ],
     }
 
 
@@ -140,6 +150,11 @@ _FILES = [
 
 def generate_recipe(req: RecipeRequest) -> GeneratedRecipe:
     out = Path(req.output_dir)
+    if out.exists() and any(out.iterdir()) and not req.overwrite:
+        raise FileExistsError(
+            f"Refusing to overwrite non-empty recipe directory {out}. "
+            "Choose a new directory or pass overwrite=True/--force."
+        )
     out.mkdir(parents=True, exist_ok=True)
     env = _env()
     ctx = _build_context(req)

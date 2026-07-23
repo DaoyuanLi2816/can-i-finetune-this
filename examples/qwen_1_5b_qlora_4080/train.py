@@ -46,20 +46,26 @@ class Config:
     seed: int = 42
     gradient_checkpointing: bool = True
     attention_implementation: str = "sdpa"
+    use_liger_kernel: bool = False
     method: str = "qlora"
     lora_rank: int = 16
     lora_alpha: int = 32
     lora_dropout: float = 0.05
-    target_modules: list = None  # type: ignore[assignment]
+    target_modules: list[str] | None = None
     base_dtype: str = "bf16"
     quantization: str = "nf4_double_quant"
     optimizer: str = "paged_adamw_8bit"
 
     @classmethod
     def from_yaml(cls, path: str | Path) -> "Config":
-        data: dict[str, Any] = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
+        config_path = Path(path).resolve()
+        data: dict[str, Any] = yaml.safe_load(config_path.read_text(encoding="utf-8"))
         kwargs = {f: data[f] for f in cls.__dataclass_fields__ if f in data}
         c = cls(**kwargs)
+        for field_name in ("dataset_path", "output_dir"):
+            value = Path(getattr(c, field_name))
+            if not value.is_absolute():
+                setattr(c, field_name, str(config_path.parent / value))
         if c.target_modules is None:
             c.target_modules = list(["q_proj", "k_proj", "v_proj", "o_proj"])
         return c
@@ -208,7 +214,7 @@ def main() -> int:
     _print_env()
 
     try:
-        from trl import SFTTrainer  # type: ignore
+        from trl import SFTTrainer
         has_sft = True
     except Exception:
         has_sft = False
@@ -266,8 +272,10 @@ def main() -> int:
             # tokenizer is passed as processing_class.
             from trl import SFTConfig
 
+            sft_kwargs = train_args.to_dict()
+            sft_kwargs["use_liger_kernel"] = cfg.use_liger_kernel
             sft_args = SFTConfig(
-                **train_args.to_dict(),
+                **sft_kwargs,
                 max_length=cfg.seq_len,
                 dataset_text_field="text",
                 packing=False,
@@ -279,6 +287,10 @@ def main() -> int:
                 processing_class=tokenizer,
             )
         except (TypeError, ImportError):
+            if cfg.use_liger_kernel:
+                raise RuntimeError(
+                    "use_liger_kernel requires a modern TRL/Transformers stack"
+                )
             # Legacy TRL (< ~0.12) keyword API.
             trainer = SFTTrainer(
                 model=model,

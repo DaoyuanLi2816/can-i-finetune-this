@@ -98,14 +98,12 @@ def _try_tiny_model_load() -> dict[str, Any]:
     """
     out: dict[str, Any] = {"attempted": True, "ok": False, "model": None, "error": None}
     try:
-        from transformers import GPT2Config, GPT2LMHeadModel  # type: ignore
+        from transformers import GPT2Config, GPT2LMHeadModel
     except Exception as e:
         out["error"] = f"transformers not importable: {e}"
         return out
     try:
-        cfg = GPT2Config(
-            vocab_size=1024, n_positions=64, n_embd=32, n_layer=2, n_head=2
-        )
+        cfg = GPT2Config(vocab_size=1024, n_positions=64, n_embd=32, n_layer=2, n_head=2)
         model = GPT2LMHeadModel(cfg)
         n_params = sum(p.numel() for p in model.parameters())
         out["ok"] = True

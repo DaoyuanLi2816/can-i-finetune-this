@@ -8,9 +8,7 @@ from typing import Any
 
 from .subprocess import try_run
 
-NVIDIA_SMI_QUERY = (
-    "name,memory.total,memory.free,driver_version,compute_cap"
-)
+NVIDIA_SMI_QUERY = "name,memory.total,memory.free,driver_version,compute_cap"
 
 
 @dataclass
@@ -113,7 +111,7 @@ def _driver_version_via_nvidia_smi() -> str:
 def _probe_torch_cuda() -> CudaInfo:
     info = CudaInfo()
     try:
-        import torch  # type: ignore
+        import torch
     except Exception:  # pragma: no cover - torch optional
         return info
     info.torch_available = True

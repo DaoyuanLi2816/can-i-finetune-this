@@ -33,19 +33,25 @@ class MemorySnapshot:
 
 
 def reset_peak() -> None:
-    import torch  # type: ignore
+    import torch
 
     if torch.cuda.is_available():
         torch.cuda.reset_peak_memory_stats()
 
 
 def snapshot(stage: str) -> MemorySnapshot:
-    import torch  # type: ignore
+    import torch
 
     if not torch.cuda.is_available():
-        return MemorySnapshot(stage=stage, allocated_gb=0, reserved_gb=0,
-                              max_allocated_gb=0, max_reserved_gb=0,
-                              free_gb=0, total_gb=0)
+        return MemorySnapshot(
+            stage=stage,
+            allocated_gb=0,
+            reserved_gb=0,
+            max_allocated_gb=0,
+            max_reserved_gb=0,
+            free_gb=0,
+            total_gb=0,
+        )
     alloc = torch.cuda.memory_allocated() / (1024**3)
     reserved = torch.cuda.memory_reserved() / (1024**3)
     max_alloc = torch.cuda.max_memory_allocated() / (1024**3)
@@ -63,7 +69,7 @@ def snapshot(stage: str) -> MemorySnapshot:
 
 
 def empty_cache() -> None:
-    import torch  # type: ignore
+    import torch
 
     if torch.cuda.is_available():
         torch.cuda.empty_cache()

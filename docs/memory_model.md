@@ -37,8 +37,9 @@ PEFT's `prepare_model_for_kbit_training` **upcasts them to fp32**:
 
 ```
 linear_params  = num_params - embeddings - norms
-weights_bytes  = linear_params * (0.5 + quant_overhead)
+weights_bytes  = linear_params * 0.5
                + (embeddings + norms) * 4.0        # fp32 after kbit-prepare
+quant_overhead = linear_params * metadata_bytes_per_param
 ```
 
 Measured: Qwen2.5-1.5B (tied, vocab 151936) loads at **1.51 GiB**
@@ -72,6 +73,12 @@ adapter_params = rank * (in_dim + out_dim)
 `canifinetune` walks all selected `target_modules` per transformer layer. For
 GQA models, K/V projections are sized using `num_key_value_heads`, not
 `num_attention_heads`.
+
+For mixture-of-experts models, adapter weights on expert MLP projections are
+multiplied by `num_local_experts`; activation memory is multiplied only by
+`num_experts_per_tok`. The base-model parameter count comes from Hub
+safetensors metadata when available, with a config-derived MoE formula as the
+offline fallback.
 
 The default `target_modules` per family mirror PEFT's defaults:
 

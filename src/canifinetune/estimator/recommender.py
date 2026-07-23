@@ -60,16 +60,19 @@ def _iter_search(base: EstimateRequest, space: SearchSpace) -> Iterable[Estimate
         if m == "qlora" and opt == "adamw_torch":
             # QLoRA almost always pairs with paged 8-bit optimizer.
             continue
-        yield base.model_copy(update={
-            "method": m,
-            "seq_len": s,
-            "micro_batch_size": b,
-            "lora_rank": r,
-            "gradient_checkpointing": ck,
-            "optimizer": opt,
-            "quantization": q,
-            "lora_target_scope": scope,
-        })
+        yield EstimateRequest.model_validate(
+            {
+                **base.model_dump(),
+                "method": m,
+                "seq_len": s,
+                "micro_batch_size": b,
+                "lora_rank": r,
+                "gradient_checkpointing": ck,
+                "optimizer": opt,
+                "quantization": q,
+                "lora_target_scope": scope,
+            }
+        )
 
 
 def recommend_configs(
@@ -94,15 +97,18 @@ def recommend_configs(
         base_overrides: Extra fields forced on every candidate (e.g.
             ``{"attention_implementation": "flash"}``).
     """
+    if top_k <= 0:
+        raise ValueError("top_k must be greater than zero")
     space = space or SearchSpace()
     base = EstimateRequest(
         model_id=model_id,
         method="qlora",
         gpu_vram_gb=gpu_vram_gb,
         override=override,
+        use_network=use_network,
     )
     if base_overrides:
-        base = base.model_copy(update=base_overrides)
+        base = EstimateRequest.model_validate({**base.model_dump(), **base_overrides})
 
     feasible: list[RecommendedConfig] = []
     marginal: list[RecommendedConfig] = []
@@ -134,6 +140,7 @@ def recommend_configs(
 # Degradation suggestions when a specific config is infeasible
 # ---------------------------------------------------------------------------
 
+
 @dataclass(frozen=True)
 class DegradationStep:
     description: str
@@ -151,7 +158,7 @@ class DegradationStep:
 
 
 def _try_step(req: EstimateRequest, description: str, **changes: Any) -> DegradationStep:
-    updated = req.model_copy(update=changes)
+    updated = EstimateRequest.model_validate({**req.model_dump(), **changes})
     est = estimate(updated)
     return DegradationStep(description=description, request=updated, estimate=est)
 
@@ -193,14 +200,20 @@ def suggest_degradations(req: EstimateRequest) -> list[DegradationStep]:
     if state.seq_len > 1024 and push("Halve seq_len", seq_len=max(1024, state.seq_len // 2)):
         return steps
 
-    if state.method != "full" and state.lora_rank > 8 and push(
-        "Halve LoRA rank", lora_rank=max(8, state.lora_rank // 2)
+    if (
+        state.method != "full"
+        and state.lora_rank > 8
+        and push("Halve LoRA rank", lora_rank=max(8, state.lora_rank // 2))
     ):
         return steps
 
-    if state.method != "full" and state.lora_target_scope == "all_linear" and push(
-        "Restrict LoRA target_modules to attention only",
-        lora_target_scope="attention",
+    if (
+        state.method != "full"
+        and state.lora_target_scope == "all_linear"
+        and push(
+            "Restrict LoRA target_modules to attention only",
+            lora_target_scope="attention",
+        )
     ):
         return steps
 
@@ -220,9 +233,7 @@ def suggest_degradations(req: EstimateRequest) -> list[DegradationStep]:
     if state.seq_len > 512 and push("Drop seq_len to 512", seq_len=512):
         return steps
 
-    if state.method != "full" and state.lora_rank > 4 and push(
-        "Drop LoRA rank to 4", lora_rank=4
-    ):
+    if state.method != "full" and state.lora_rank > 4 and push("Drop LoRA rank to 4", lora_rank=4):
         return steps
 
     # Last resort: caller has to pick a smaller model. We surface that as a
