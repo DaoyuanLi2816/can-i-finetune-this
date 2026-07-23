@@ -14,14 +14,14 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
       - run: |
           python -m pip install --upgrade pip
           python -m pip install build
-          python -m pip install -e ".[dev,report]"
+          python -m pip install -e ".[dev]"
       - name: Verify release tag matches package version
         shell: bash
         run: |
