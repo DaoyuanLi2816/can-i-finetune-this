@@ -83,6 +83,9 @@ def qualify(training=False, cuda=False, receipt=None):
                         device=device,
                         base_dtype="fp32" if device == "cpu" else "bf16",
                         optimizer="paged_adamw_8bit" if method == "qlora" else "adamw_torch",
+                        # Tiny dimensions need >=4096-element adapter tensors
+                        # to exercise actual 8-bit optimizer state allocation.
+                        lora_rank=128 if method == "qlora" else 16,
                         seq_len=128,
                         max_steps=2,
                         gradient_accumulation_steps=1,
@@ -103,6 +106,8 @@ def qualify(training=False, cuda=False, receipt=None):
                 run = json.loads((recipe / "output/run.json").read_text(encoding="utf-8"))
                 assert run["status"] == "success" and run["completed_updates"] == 2
                 assert run["effective_configuration"]["method"] == method
+                if method == "qlora":
+                    assert "uint8" in run["effective_configuration"]["optimizer_state_dtypes"]
                 import torch
 
                 artifact = recipe / "output" / run["saved_artifact"]
