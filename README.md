@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/DaoyuanLi2816/can-i-finetune-this/actions/workflows/ci.yml/badge.svg)](https://github.com/DaoyuanLi2816/can-i-finetune-this/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/canifinetune.svg)](https://pypi.org/project/canifinetune/)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](https://github.com/DaoyuanLi2816/can-i-finetune-this/blob/v0.4.0/LICENSE)
 
 **A single-GPU LLM fine-tuning preflight: estimate a memory budget, inspect the
 assumptions, generate a recipe, then measure a bounded local run.**
@@ -25,7 +25,7 @@ or UI dependencies. This is a local application; it is not a hosted service.
 A budget is not a guarantee that training will fit. All `*_gb` JSON fields use
 **GiB**, including historical files. `confidence` is not a calibrated probability
 or error interval. Historical RTX 4080 measurements informed the coefficients;
-[prospective validation](docs/validation-0.4.0.md) reports fresh observations
+[prospective validation](https://github.com/DaoyuanLi2816/can-i-finetune-this/blob/v0.4.0/docs/validation-0.4.0.md) reports fresh observations
 separately, including substantial overestimates. No cross-GPU accuracy claim.
 
 ## From estimate to an executable recipe
@@ -53,7 +53,7 @@ python my-recipe/eval_smoke.py --output-dir my-recipe/output --max-new-tokens 8
 
 These are individual commands usable in PowerShell or a Linux shell. Environment
 creation/activation differs by platform; see the complete
-[PyPI-only walkthrough](docs/quickstart.md). Native Windows CPU/CUDA is verified;
+[PyPI-only walkthrough](https://github.com/DaoyuanLi2816/can-i-finetune-this/blob/v0.4.0/docs/quickstart.md). Native Windows CPU/CUDA is verified;
 Linux CPU runs in CI. WSL GPU qualification is not claimed for this release.
 
 An adapter is saved under `output/adapter`; a full fine-tune under `output/model`.
@@ -91,7 +91,7 @@ are rejected; there is no string-search fallback. `--truncation error` is the
 default. Explicit `right` truncation must preserve response supervision after the
 causal label shift. Padding is masked by position; genuine EOS survives when
 PAD and EOS share an ID. Invalid rows report their line and stop the run.
-See the generated `dataset_format.md` and [training contract](docs/training.md).
+See the generated `dataset_format.md` and [training contract](https://github.com/DaoyuanLi2816/can-i-finetune-this/blob/v0.4.0/docs/training.md).
 
 Dtype, attention, quantization, target scope, optimizer, checkpointing and backend
 share a validated configuration. Invalid/unknown settings fail; attention or
@@ -128,7 +128,7 @@ Evidence export is explicit opt-in, preview-first and local. It removes personal
 paths, detailed exceptions, model identity, GPU UUIDs and unknown fields by
 allowlist. `--include-public-model` separately opts into a public Hub identifier
 and revision. Review the JSON before sharing; never include private samples or
-credentials. [Contribution instructions](CONTRIBUTING.md) explain manual issue/PR
+credentials. [Contribution instructions](https://github.com/DaoyuanLi2816/can-i-finetune-this/blob/v0.4.0/CONTRIBUTING.md) explain manual issue/PR
 submission. Community uploads remain unreviewed and cannot enter calibration or
 independent accuracy summaries automatically. There are no automatic uploads.
 
@@ -144,7 +144,7 @@ instead of inventing missing rates.
 Core: Python 3.10–3.14, no torch. Qualified training: Python 3.12, torch 2.6,
 Transformers 4.57.6 / PEFT 0.18.1 / Accelerate 1.12 (minimum combination), or
 Transformers 5.8.1 / PEFT 0.19.1 / Accelerate 1.13 (recommended), bitsandbytes
-0.49.2. [Constraints](constraints) reproduce both. Newer upstream releases are
+0.49.2. [Constraints](https://github.com/DaoyuanLi2816/can-i-finetune-this/tree/v0.4.0/constraints) reproduce both. Newer upstream releases are
 not silently included in the supported range. TRL/datasets are no longer needed.
 
 ```console
@@ -159,13 +159,13 @@ python scripts/check_generated.py
 After installing a qualified training stack: `pytest -q tests/integration`.
 Core coverage excludes optional torch runtime/smoke creation; real training
 behavior has a separate CI job. CI also installs wheels outside the checkout.
-[Release verification](docs/releasing.md) preserves the same tested candidate
+[Release verification](https://github.com/DaoyuanLi2816/can-i-finetune-this/blob/v0.4.0/docs/releasing.md) preserves the same tested candidate
 files through GitHub Release and PyPI Trusted Publishing, then checks public
 hashes and installation.
 
 Scope: one consumer NVIDIA GPU, causal HF models, full/tiny training and
 LoRA/QLoRA. Distributed training, remote code and automatic gated-model approval
-are unsupported. See [changelog](CHANGELOG.md), [troubleshooting](docs/troubleshooting.md)
-and [historical development baselines](docs/rtx4080_baselines.md).
+are unsupported. See [changelog](https://github.com/DaoyuanLi2816/can-i-finetune-this/blob/v0.4.0/CHANGELOG.md), [troubleshooting](https://github.com/DaoyuanLi2816/can-i-finetune-this/blob/v0.4.0/docs/troubleshooting.md)
+and [historical development baselines](https://github.com/DaoyuanLi2816/can-i-finetune-this/blob/v0.4.0/docs/rtx4080_baselines.md).
 
 MIT. Maintainer: Daoyuan Li.
