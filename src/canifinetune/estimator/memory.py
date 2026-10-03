@@ -7,34 +7,22 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, model_validator
 
+from ..configuration import TrainingConfig, resolve_targets
 from ..utils.units import bytes_to_gb
 from . import formulas as F
-from .calibration import Calibration, apply_calibration
+from .calibration import Calibration, apply_calibration, calibration_signature
 from .model_metadata import ModelMetadata, fetch_metadata
 
 Method = Literal["full", "lora", "qlora"]
 Confidence = Literal["low", "medium", "high"]
 
 
-class EstimateRequest(BaseModel):
+class EstimateRequest(TrainingConfig):
     """Inputs to :func:`estimate`. Validated with pydantic."""
 
-    model_id: str = Field(..., description="HF model id, e.g. Qwen/Qwen2.5-1.5B-Instruct")
-    method: Method = "qlora"
     gpu_vram_gb: float = Field(..., gt=0.0, description="Total GPU VRAM in gibibytes.")
-    seq_len: int = Field(2048, gt=0)
-    micro_batch_size: int = Field(1, gt=0)
-    gradient_accumulation_steps: int = Field(1, gt=0)
-
-    base_dtype: str = "bf16"
-    quantization: str = "nf4_double_quant"  # only used for qlora
-    lora_rank: int = Field(16, gt=0)
-    lora_target_scope: Literal["attention", "all_linear", "conservative"] = "attention"
-
-    optimizer: str = "paged_adamw_8bit"
-    gradient_checkpointing: bool = True
-    attention_implementation: str = "sdpa"
-    activation_dtype: str = "bf16"
+    available_vram_gb: float | None = Field(None, gt=0)
+    activation_dtype: str | None = None
 
     # If you've cached calibration, the CLI passes it in; library users
     # can pass a :class:`Calibration` directly.
@@ -47,16 +35,11 @@ class EstimateRequest(BaseModel):
 
     @model_validator(mode="after")
     def _normalize_method(self) -> EstimateRequest:
-        if self.method == "full":
-            self.quantization = "none"
-        if self.method == "lora" and self.quantization.lower() not in {
-            "none",
-            "fp16",
-            "bf16",
-            "fp32",
-        }:
-            # LoRA on non-quantized base.
-            self.quantization = "bf16"
+        if self.activation_dtype is not None and self.activation_dtype != self.base_dtype:
+            raise ValueError("activation_dtype must match base_dtype in the shared runtime")
+        object.__setattr__(self, "activation_dtype", self.base_dtype)
+        if self.available_vram_gb is not None and self.available_vram_gb > self.gpu_vram_gb:
+            raise ValueError("available_vram_gb cannot exceed total gpu_vram_gb")
         return self
 
 
@@ -74,6 +57,15 @@ class MemoryBreakdown(BaseModel):
 
 
 class Estimate(BaseModel):
+    estimator_version: str = "0.4.0"
+    units: str = "GiB (legacy *_gb fields)"
+    confidence_basis: str = "Heuristic evidence grade, not a calibrated probability interval. Historical data informed the formulas."
+    evidence_scope: str = "Historical RTX 4080 dense causal LM measurements; independent and cross-hardware accuracy is not guaranteed."
+    requested_configuration: dict[str, Any] = Field(default_factory=dict)
+    planned_configuration: dict[str, Any] = Field(default_factory=dict)
+    measurement_target: str = (
+        "process torch peak reserved, load plus bounded training; safety margin reported separately"
+    )
     request: EstimateRequest
     metadata: dict[str, Any]
     memory: MemoryBreakdown
@@ -116,6 +108,11 @@ def _compute_breakdown(req: EstimateRequest, md: ModelMetadata) -> MemoryBreakdo
         trainable_params = total_params
         adapter_b = 0.0  # already counted in weights
     else:
+        defaults = F.default_target_modules(md.family, scope=req.lora_target_scope, strict=True)
+        if req.target_modules is not None and req.target_modules != defaults:
+            raise ValueError(
+                "custom target_modules need an architecture-specific memory model; use a supported target scope"
+            )
         trainable_params = F.lora_trainable_params(
             arch=arch,
             family=md.family,
@@ -125,21 +122,25 @@ def _compute_breakdown(req: EstimateRequest, md: ModelMetadata) -> MemoryBreakdo
         adapter_b = F.adapter_weights_bytes(trainable_params=trainable_params)
 
     # 3) Gradients (fp32 for LoRA adapters, bf16 for full fine-tunes where
-    #    the fp32 master copy lives in the optimizer term).
+    #    full-training gradients follow the loaded parameter dtype).
     grad_b = F.gradients_bytes(
         trainable_params=trainable_params,
-        grad_dtype="bf16" if req.method == "full" else "fp32",
+        grad_dtype=req.base_dtype if req.method == "full" else "fp32",
     )
 
     # 4) Optimizer states.
-    opt_b = F.optimizer_bytes(trainable_params=trainable_params, optimizer=req.optimizer)
+    opt_b = F.optimizer_bytes(
+        trainable_params=trainable_params,
+        optimizer=req.optimizer,
+        parameter_dtype=req.base_dtype if req.method == "full" else "fp32",
+    )
 
     # 5) Activations.
     act_b = F.activations_bytes(
         seq_len=req.seq_len,
         batch_size=req.micro_batch_size,
         arch=arch,
-        activation_dtype=req.activation_dtype,
+        activation_dtype=req.base_dtype,
         use_gradient_checkpointing=req.gradient_checkpointing,
         attention_implementation=req.attention_implementation,
         family=md.family,
@@ -152,8 +153,10 @@ def _compute_breakdown(req: EstimateRequest, md: ModelMetadata) -> MemoryBreakdo
         seq_len=req.seq_len,
         batch_size=req.micro_batch_size,
         vocab_size=arch.vocab_size,
-        logits_dtype=req.activation_dtype,
+        logits_dtype=req.base_dtype,
     )
+    # Liger is a different loss allocation path. Until separately calibrated,
+    # retain the stock upper-planning proxy and explicitly mark low confidence.
 
     # 7) CUDA / fragmentation / safety.
     cuda_b = F.cuda_overhead_bytes(available_vram_gb=req.gpu_vram_gb)
@@ -263,8 +266,10 @@ def _choose_confidence(
     breakdown: MemoryBreakdown,
     calibrated: bool,
 ) -> str:
+    if req.loss_backend == "liger":
+        return "low"
     if calibrated:
-        return "high"
+        return "medium"
     if md.arch.num_local_experts > 1:
         return "low"
     if req.seq_len <= 2048 and req.micro_batch_size <= 2:
@@ -282,22 +287,26 @@ def estimate(req: EstimateRequest) -> Estimate:
     )
     breakdown = _compute_breakdown(req, md)
     calibration_applied = bool(
-        req.calibration
+        req.loss_backend == "stock"
+        and req.calibration
         and req.calibration.is_compatible(
             model_family=md.family,
             method=req.method,
             gpu_vram_gb=req.gpu_vram_gb,
+            config_signature=calibration_signature(req.training_fields()),
         )
     )
     breakdown = apply_calibration(
         breakdown,
-        req.calibration,
+        req.calibration if req.loss_backend == "stock" else None,
         model_family=md.family,
         method=req.method,
         gpu_vram_gb=req.gpu_vram_gb,
+        config_signature=calibration_signature(req.training_fields()),
     )
     feasibility, ratio = _classify_feasibility(
-        total_gb=breakdown.total_estimated_gb, gpu_vram_gb=req.gpu_vram_gb
+        total_gb=breakdown.total_estimated_gb,
+        gpu_vram_gb=req.available_vram_gb or req.gpu_vram_gb,
     )
     confidence = _choose_confidence(
         req,
@@ -307,9 +316,22 @@ def estimate(req: EstimateRequest) -> Estimate:
     )
     assumptions = _build_assumptions(req, md)
     warnings = _build_warnings(req, md, breakdown)
+    if req.loss_backend == "liger":
+        warnings.append(
+            "Liger fused loss: stock logits proxy retained as a conservative planning assumption; no fused-loss accuracy claim or stock calibration applies."
+        )
+    if calibration_applied:
+        warnings.append(
+            "Calibration is a fit to supplied runs, not independent accuracy evidence or a statistical confidence interval."
+        )
 
     return Estimate(
         request=req,
+        requested_configuration=req.training_fields(),
+        planned_configuration={
+            **req.training_fields(),
+            "target_modules": resolve_targets(req, md.family),
+        },
         metadata={
             "model_id": md.model_id,
             "family": md.family,

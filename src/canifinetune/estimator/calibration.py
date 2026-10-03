@@ -22,6 +22,8 @@ log = get_logger("estimator.calibration")
 class CalibrationSample(BaseModel):
     """One benchmark-derived (estimate, measured) pair."""
 
+    config_signature: dict[str, Any] = Field(default_factory=dict)
+    estimator_version: str = "0.4.0"
     gpu_name: str
     torch_version: str
     cuda_version: str
@@ -56,7 +58,9 @@ class CalibrationSample(BaseModel):
 class Calibration(BaseModel):
     """A bundle of calibration samples + a derived multiplicative correction."""
 
-    schema_version: int = 2
+    schema_version: int = 3
+    estimator_version: str = "0.4.0"
+    configuration_profiles: list[dict[str, Any]] = Field(default_factory=list)
     samples: list[CalibrationSample] = Field(default_factory=list)
     activation_scale: float = 1.0
     weights_scale: float = 1.0
@@ -69,7 +73,18 @@ class Calibration(BaseModel):
     def has_data(self) -> bool:
         return bool(self.samples)
 
-    def is_compatible(self, *, model_family: str, method: str, gpu_vram_gb: float) -> bool:
+    def is_compatible(
+        self,
+        *,
+        model_family: str,
+        method: str,
+        gpu_vram_gb: float,
+        config_signature: dict | None = None,
+    ) -> bool:
+        if self.estimator_version != "0.4.0":
+            return False
+        if self.configuration_profiles and config_signature not in self.configuration_profiles:
+            return False
         if not self.has_data():
             return False
         if self.model_families and model_family not in self.model_families:
@@ -105,6 +120,10 @@ def load_calibration(path: Path | None = None) -> Calibration:
                 p,
             )
             return Calibration(note="Legacy calibration ignored; rerun `canifinetune calibrate`.")
+        if payload.get("schema_version") != 3:
+            return Calibration(
+                note="Legacy calibration ignored; rerun calibrate with matching new measurements."
+            )
         return Calibration.model_validate(payload)
     except Exception as e:
         log.warning("Failed to read calibration %s: %s — using empty.", p, e)
@@ -150,6 +169,10 @@ def fit_calibration_from_samples(samples: list[CalibrationSample]) -> Calibratio
         activation_scale=activation_scale,
         weights_scale=1.0,
         overhead_scale=overhead_scale,
+        configuration_profiles=[s.config_signature for s in samples if s.config_signature],
+        estimator_version=samples[0].estimator_version
+        if len({s.estimator_version for s in samples}) == 1
+        else "mixed",
         model_families=sorted({s.model_family for s in samples if s.model_family}),
         methods=sorted({s.method for s in samples if s.method}),
         gpu_vram_gb=float(statistics.median(gpu_sizes)) if gpu_sizes else 0.0,
@@ -168,12 +191,14 @@ def apply_calibration(
     model_family: str = "",
     method: str = "",
     gpu_vram_gb: float = 0.0,
+    config_signature: dict | None = None,
 ) -> MemoryBreakdown:
     """Return ``breakdown`` adjusted by ``calibration``. No-op if unset."""
     if calibration is None or not calibration.is_compatible(
         model_family=model_family,
         method=method,
         gpu_vram_gb=gpu_vram_gb,
+        config_signature=config_signature,
     ):
         return breakdown
 
@@ -223,6 +248,31 @@ def calibration_from_result_files(paths: list[Path]) -> Calibration:
 
 
 def _result_to_sample(data: dict[str, Any]) -> CalibrationSample | None:
+    if not isinstance(data, dict):
+        return None
+    if data.get("success") is False or data.get("oom", {}).get("happened"):
+        return None
+    if data.get("provenance", {}).get("source") == "community":
+        return None
+    if data.get("schema_version") == 2:
+        if data.get("status") != "success" or data.get("estimator_version") != "0.4.0":
+            return None
+        if not data.get("effective_configuration") or data.get("config", {}).get("forward_only"):
+            return None
+        if data.get("completed_steps") != data.get("config", {}).get("steps") or not data.get(
+            "estimated_breakdown"
+        ):
+            return None
+        if not all(
+            data.get("measured", {}).get(key, 0) > 0
+            for key in ("peak_allocated_gb", "peak_reserved_gb")
+        ):
+            return None
+        if data.get("config", {}).get("loss_backend", "stock") != "stock":
+            return None
+        if data.get("provenance", {}).get("cohort") == "validation":
+            log.warning("Validation cohort is reserved for evaluation; cannot fit it.")
+            return None
     measured = data.get("measured", {})
     measured_allocated = float(measured.get("peak_allocated_gb") or 0.0)
     measured_reserved = float(
@@ -238,24 +288,6 @@ def _result_to_sample(data: dict[str, Any]) -> CalibrationSample | None:
         cfg = data.get("config", {})
         gpu = data.get("gpu", {})
         breakdown = dict(data.get("estimated_breakdown") or {})
-        if not breakdown and cfg.get("model_id") and gpu.get("total_vram_gb"):
-            from .memory import EstimateRequest, estimate
-
-            request_fields = {
-                "model_id": cfg["model_id"],
-                "method": cfg.get("method", data.get("method", "qlora")),
-                "gpu_vram_gb": float(gpu["total_vram_gb"]),
-                "seq_len": int(cfg.get("seq_len") or 2048),
-                "micro_batch_size": int(cfg.get("micro_batch_size") or 1),
-                "lora_rank": int(cfg.get("lora_rank") or 16),
-                "lora_target_scope": cfg.get("lora_target_scope", "attention"),
-                "optimizer": cfg.get("optimizer", "paged_adamw_8bit"),
-                "quantization": cfg.get("quantization", "nf4_double_quant"),
-                "base_dtype": cfg.get("base_dtype", "bf16"),
-                "gradient_checkpointing": bool(cfg.get("gradient_checkpointing", True)),
-                "attention_implementation": cfg.get("attention_implementation", "sdpa"),
-            }
-            breakdown = estimate(EstimateRequest(**request_fields)).memory.model_dump()
         static_gb = sum(
             float(breakdown.get(key) or 0.0)
             for key in (
@@ -269,6 +301,10 @@ def _result_to_sample(data: dict[str, Any]) -> CalibrationSample | None:
             breakdown.get("logits_gb") or 0.0
         )
         return CalibrationSample(
+            estimator_version=data.get("estimator_version", "legacy"),
+            config_signature=calibration_signature(data.get("effective_configuration") or cfg)
+            if data.get("schema_version") == 2
+            else {},
             gpu_name=str(gpu.get("name") or "unknown"),
             torch_version=str(data.get("env", {}).get("torch_version") or ""),
             cuda_version=str(data.get("env", {}).get("cuda_version") or ""),
@@ -290,3 +326,26 @@ def _result_to_sample(data: dict[str, Any]) -> CalibrationSample | None:
     except Exception as e:
         log.warning("Skipping result (incomplete): %s", e)
         return None
+
+
+def calibration_signature(config: dict) -> dict:
+    return {
+        key: config.get(key)
+        for key in (
+            "base_dtype",
+            "quantization",
+            "optimizer",
+            "gradient_checkpointing",
+            "attention_implementation",
+            "loss_backend",
+            "lora_target_scope",
+            "seq_len",
+            "micro_batch_size",
+            "lora_rank",
+            "training_backend",
+            "gradient_accumulation_steps",
+            "lora_alpha",
+            "lora_dropout",
+            "loss_mode",
+        )
+    }

@@ -1,7 +1,7 @@
 # Memory model
 
 `canifinetune` decomposes the GPU memory footprint of a training step into the
-following components. All numbers are in bytes; the CLI rounds to GB on output.
+following components. All numbers are in bytes; the CLI rounds to GiB on output.
 
 ```
 Total estimated VRAM
@@ -15,12 +15,19 @@ Total estimated VRAM
    + safety margin
 ```
 
-The coefficients below were calibrated against `torch.cuda.max_memory_allocated`
-traces on an RTX 4080 (torch 2.6, transformers 5.8, peft 0.19, bitsandbytes
-0.49) across Qwen2.5-0.5B/1.5B/3B/7B, seq 512–4096, batch 1–2, LoRA + QLoRA,
-checkpointing on/off. On those runs the sum of the "real" components lands
-within about ±10% of the measured peak (see `tests/test_estimator_accuracy.py`
-and `docs/rtx4080_baselines.md`).
+Historical RTX 4080 development measurements informed these coefficients.
+Historical regression tolerances describe fitted-set consistency, not independent
+accuracy. See [0.4.0 prospective validation](validation-0.4.0.md) for the frozen
+new cohort, substantial conservative errors and old/new same-observation comparison.
+No coefficients were fitted on that cohort. Confidence is a qualitative evidence
+grade, never a statistical probability. All `*_gb` fields mean GiB (2**30 bytes).
+
+Compare observed process `peak_reserved_gb` with the process planning proxy
+`total_estimated_gb - safety_margin_gb`. Allocated and reserved differ; device
+free/total readings are a different scope. For feasibility compare the total
+planning budget (including safety once) with currently free capacity if supplied.
+Keep overhead allowances based on actual total hardware capacity. OOM has no exact
+peak; missing values are not zero. A three-update probe is bounded evidence.
 
 ## 1. Weights
 
@@ -99,25 +106,20 @@ model is frozen), and the adapters live in fp32:
 gradients_bytes = trainable_params * 4.0     # fp32 adapters
 ```
 
-For full fine-tuning we charge bf16 gradients (the fp32 master copy is
-accounted for in the optimizer term).
+For full training, gradients use the explicitly loaded base parameter dtype.
+FP32 weights therefore require FP32 gradients; BF16 uses BF16 gradients.
 
 ## 4. Optimizer states
 
-Per-parameter bytes for the most common optimizers:
-
-| optimizer                      | bytes/param |
-| ------------------------------ | ----------- |
-| adamw_torch (fp32 m+v+master)  | 12.0        |
-| paged_adamw_32bit              | 12.0        |
-| adamw_8bit / paged_adamw_8bit  | 2.5         |
-| sgd                            | 4.0         |
-| sgd + momentum                 | 8.0         |
-| lion_8bit                      | 2.0         |
-| adafactor                      | 4.0         |
-
-This is multiplied by `trainable_params`, *not* total parameters. For LoRA
-/ QLoRA, the optimizer footprint is consequently tiny (a few MB).
+Native torch AdamW stores two state tensors in parameter dtype. There is no
+implicit FP32 master-weight copy. Non-fused CUDA foreach can add a tensor-sized
+workspace: the planning charge is 3 times parameter bytes, versus 2 times for
+fused AdamW. FP32 adapter AdamW thus charges 12 B/param (8 B states + 4 B workspace),
+and fused charges 8 B. Plain SGD in this runtime has no momentum state (0 B).
+8-bit/paged AdamW charges 2.5 B/param as a heuristic; small tensors may use FP32
+state, so this is not an exact optimizer allocation prediction. Real receipts
+record optimizer class and state dtypes. The runtime supports only optimizers in
+TrainingConfig; historical formula entries are not a training support promise.
 
 ## 5. Activations
 
@@ -184,10 +186,10 @@ feasible == "marginal" if 0.85 < ratio <= 0.97
 feasible == "no"       otherwise
 ```
 
-The 0.85 threshold is empirical: with that headroom, every QLoRA
-configuration we benchmark on an RTX 4080 finishes the smoke run without OOM
-(see `docs/rtx4080_baselines.md`), including a seq-4096 run measured at 83%
-of VRAM.
+These are heuristic planning thresholds, not calibrated OOM probabilities.
+Historical fitting runs do not establish a success rate on new hardware or
+workloads. Prospective reports state the matched yes/no denominators explicitly;
+`marginal` and `unknown` are excluded from those binary rates.
 
 ## When the estimator is wrong
 
@@ -198,13 +200,14 @@ Common reasons for the static estimate diverging from reality:
   This is the safe direction, but worth knowing.
 - **Very long seq_len (≥ 8192)**: allocator fragmentation grows with the
   largest single tensors; the flat 8% overhead can be too optimistic.
-- **No flash-attn**: if the model silently falls back to eager attention,
-  pass `--attn eager` so the `s²` term is included.
+- **Different attention**: explicitly select `--attn eager` if needed so the
+  quadratic term is included. This runtime rejects silent attention changes.
 - **Different PEFT versions**: the fp32 upcast of embeddings/norms is
   `prepare_model_for_kbit_training` behavior; skipping that call (or using
   `bnb_4bit_quant_storage` tricks) changes the static term.
 - **Loaded display GPU**: the OS / desktop / browser take VRAM at runtime.
-  Use `canifinetune doctor` to see free VRAM, and pass that as `--gpu-vram-gb`
-  if you want a tighter feasibility decision.
+  Use `canifinetune doctor` to see free VRAM, and pass it as `--available-vram-gb`
+  while retaining the hardware total in `--gpu-vram-gb`.
 
-When in doubt: run `canifinetune bench` and `canifinetune calibrate`.
+Run a bounded bench before relying on a budget. Calibration fits a development
+cohort; it does not independently validate the resulting estimates.

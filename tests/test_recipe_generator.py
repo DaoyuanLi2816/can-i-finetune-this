@@ -86,9 +86,11 @@ def test_recipe_resolves_data_and_output_relative_to_config(tmp_path: Path):
             output_dir=out,
         )
     )
-    train = (out / "train.py").read_text(encoding="utf-8")
-    assert 'for field_name in ("dataset_path", "output_dir")' in train
-    assert "config_path.parent / value" in train
+    from canifinetune.training.runtime import RunConfig
+
+    config = RunConfig.from_yaml(out / "config.yaml")
+    assert config.dataset_path == str((out / "data/sample.jsonl").resolve())
+    assert config.output_dir == str((out / "output").resolve())
 
 
 def test_recipe_includes_target_modules_for_family(tmp_path: Path):
@@ -121,8 +123,9 @@ def test_recipe_can_enable_liger_kernels(tmp_path: Path):
     )
 
     requirements = (out / "requirements.txt").read_text(encoding="utf-8")
-    config = (out / "config.yaml").read_text(encoding="utf-8")
-    train = (out / "train.py").read_text(encoding="utf-8")
+    (out / "config.yaml").read_text(encoding="utf-8")
+    from canifinetune.training.runtime import RunConfig
+
+    parsed = RunConfig.from_yaml(out / "config.yaml")
     assert "liger-kernel>=0.5" in requirements
-    assert "use_liger_kernel: true" in config
-    assert 'sft_kwargs["use_liger_kernel"]' in train
+    assert parsed.use_liger_kernel and parsed.loss_backend == "liger"

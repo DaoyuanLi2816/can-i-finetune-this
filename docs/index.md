@@ -1,6 +1,12 @@
-# canifinetune docs
+# Documentation
 
-- [Memory model](memory_model.md) — how the estimator decomposes training memory.
-- [RTX 4080 baselines](rtx4080_baselines.md) — real benchmark results on a single 16 GB consumer card.
-- [Troubleshooting](troubleshooting.md) — OOM, bitsandbytes, Windows, gated models, flash-attn.
-- [Design notes](design.md) — module layout, extension points.
+- [PyPI quickstart](quickstart.md)
+- [Training/data contract and migration](training.md)
+- [Memory model and evidence limits](memory_model.md)
+- [0.4.0 prospective validation](validation-0.4.0.md)
+- [Historical development baselines](rtx4080_baselines.md)
+- [Troubleshooting](troubleshooting.md)
+- [Design](design.md)
+- [Contribution guide](../CONTRIBUTING.md)
+- [Release verification](releasing.md)
+- [Implementation/qualification record](delivery-0.4.0.md)

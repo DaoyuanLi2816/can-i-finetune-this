@@ -46,8 +46,29 @@ def test_use_network_false_does_not_call_hub(monkeypatch):
     def fail(*args, **kwargs):
         raise AssertionError("network helper should not be called")
 
-    monkeypatch.setattr(metadata, "fetch_model_config", fail)
+    def cache_only(*args, **kwargs):
+        assert kwargs["local_files_only"] is True
+        return None
+
+    monkeypatch.setattr(metadata, "fetch_model_config", cache_only)
     monkeypatch.setattr(metadata, "fetch_model_parameter_count", fail)
 
     with pytest.raises(ValueError, match="Cannot resolve metadata"):
         metadata.fetch_metadata("test/unknown-model", use_network=False)
+
+
+def test_offline_config_cache_never_downloads(monkeypatch, tmp_path):
+    import huggingface_hub
+
+    from canifinetune.utils.hf import fetch_model_config
+
+    def fail(*args, **kwargs):
+        raise AssertionError("offline lookup attempted network")
+
+    monkeypatch.setattr(huggingface_hub, "hf_hub_download", fail)
+    monkeypatch.setattr(huggingface_hub, "try_to_load_from_cache", lambda **kwargs: None)
+    assert fetch_model_config("org/uncached", local_files_only=True) is None
+    config = tmp_path / "config.json"
+    config.write_text('{"model_type":"qwen2"}', encoding="utf-8")
+    monkeypatch.setattr(huggingface_hub, "try_to_load_from_cache", lambda **kwargs: str(config))
+    assert fetch_model_config("org/cached", local_files_only=True) == {"model_type": "qwen2"}

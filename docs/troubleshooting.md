@@ -1,132 +1,65 @@
 # Troubleshooting
 
-## CUDA OOM during training
+## Missing dependencies or CUDA
 
-In order of "least disruptive" first:
+Core estimate/recipe/demo needs no torch. Actual training needs the qualified
+[quickstart stack](quickstart.md). Use a fresh project environment if unrelated
+packages cause import failures. CPU uses explicit `--device cpu --base-dtype fp32
+--optimizer adamw_torch` and full/LoRA. QLoRA and 8-bit optimizers require CUDA.
+`nvidia-smi` working does not establish that the installed torch wheel has CUDA;
+check `canifinetune doctor` and `torch.cuda.is_available()`. Do not replace global
+CUDA or other project environments to fix this package.
 
-1. Re-run with `--steps 1` to isolate whether OOM is at warmup or after several
-   steps.
-2. `micro_batch_size = 1`.
-3. Increase `gradient_accumulation_steps` to preserve effective batch size.
-4. Halve `seq_len` (e.g. 2048 → 1024).
-5. Halve `lora_rank` (e.g. 16 → 8).
-6. Restrict `target_modules` to attention-only (`q_proj`, `k_proj`, `v_proj`, `o_proj`).
-7. If `method == "lora"`, switch to QLoRA: `--method qlora --quantization nf4_double_quant --optimizer paged_adamw_8bit`.
-8. Use a smaller base model. `canifinetune recommend --gpu-vram-gb <your-gb>`
-   will list options that fit.
+The verified combination is torch 2.6.0/cu124 and bitsandbytes 0.49.2. Use the
+provided constraints instead of an unbounded upgrade. Windows console logs with
+non-ASCII text should use `$env:PYTHONUTF8="1"` in PowerShell. Linux uses
+`export PYTHONUTF8=1`. CI sets UTF-8 explicitly.
 
-If OOM happens at *model load* (before training starts), gradient checkpointing
-will not help — you need 4-bit quantization or a smaller model.
+## Dataset or configuration rejected
 
-## bitsandbytes import or `CUDA_SETUP` errors
+Read the line number and generated `dataset_format.md`. Preserve system/multi-turn
+records; unsupported roles or templates fail explicitly. Assistant-only chat needs
+native generation masks. Empty replies and no shifted supervised labels fail.
+Increase sequence length, shorten input deliberately, or explicitly opt into
+`truncation: right`; right truncation still cannot remove all response labels.
+Unknown config keys fail. Regenerate old recipes rather than copying legacy
+`save_steps`/TRL settings into the strict schema. Output must be empty; choose a
+fresh directory. `--force` overwrites generated recipe files only, never a run.
 
-- Update: `pip install --upgrade bitsandbytes>=0.43.1`. Recent versions ship
-  official **Windows wheels** — no manual build needed.
-- Verify: `python -c "import bitsandbytes as bnb; print(bnb.__version__)"`.
-- `bnb.optim.PagedAdamW8bit` requires `bitsandbytes >= 0.43`.
+## OOM or a busy display GPU
 
-## CUDA / driver mismatch
+Reduce micro-batch/sequence length, use attention-only targets, QLoRA or a smaller
+model, and re-estimate the changed configuration. Accumulation preserves effective
+batch after reducing micro-batch; it does not shrink a single micro-batch. A load
+OOM will not be fixed by checkpointing. Inspect `run.json`/bench stage locally.
+An OOM receipt has no exact peak and cannot be evaluated as successful.
 
-Symptom: `torch.cuda.is_available()` is `False` even though `nvidia-smi`
-works.
+Keep actual total capacity in `--gpu-vram-gb` and pass currently free capacity
+separately with `--available-vram-gb`. Background allocations change; don't compare
+device-level usage directly with process allocator peaks. Safety is an additional
+planning allowance, not part of observed reserved memory. A short probe cannot
+guarantee a long run will fit. Do not terminate unrelated Python processes.
 
-Fix: install a torch wheel that matches your driver's CUDA support level:
+## BF16, attention, Liger
 
-```bash
-pip install --index-url https://download.pytorch.org/whl/cu124 torch
-# or, for older drivers:
-pip install --index-url https://download.pytorch.org/whl/cu121 torch
-pip install --index-url https://download.pytorch.org/whl/cu118 torch
-```
+Unsupported BF16 is an explicit error. Choose fp16 for a supported adapter path
+or fp32, then re-estimate. Full fp16 weight training is rejected. Use SDPA/eager
+explicitly if Flash Attention is unavailable; no loader retry removes attention.
+Flash Attention and Linux/Triton Liger have not received 0.4.0 CUDA qualification.
+Liger's estimate is a low-confidence stock upper planning proxy. Bench rejects it.
 
-The matrix is published at https://pytorch.org/get-started/locally/. Driver
-13.2 (the version behind the RTX 4080 baselines in this repo) supports
-`cu121` and `cu124` wheels; `cu124` is what was actually used.
+## Offline and gated models
 
-## Windows / WSL caveats
+`--offline` uses curated metadata, local directories or cached config; unknown
+uncached metadata fails clearly. Training additionally needs cached weights and
+tokenizers. Curated metadata does not establish access to gated weights. Obtain
+access under the model's terms yourself and authenticate using the normal Hub
+workflow. Never put credentials in datasets, YAML, issues or logs for sharing.
+Remote model code is disabled; models requiring it are unsupported.
 
-- `bitsandbytes` ≥ 0.43 supports native Windows. Older versions need WSL2.
-- File I/O inside OneDrive can sync `*.safetensors` files mid-write. If you
-  see strange checkpoint corruption, either set `HF_HOME` to a path outside
-  OneDrive or pause OneDrive sync during training.
-- `signal` handling differs from POSIX; if a training run is interrupted
-  with Ctrl+C and torch processes are left behind, kill them via
-  `Get-Process python | Stop-Process`.
+## Reload or save failure
 
-## flash-attn install failure
-
-flash-attention 2 builds against a specific CUDA toolkit and needs a matching
-wheel. If `pip install flash-attn` fails:
-
-- Use `attention_implementation: "sdpa"` in the recipe (PyTorch ≥ 2.2 has a
-  built-in scaled-dot-product attention that is nearly as fast).
-- Or use `"eager"` to fall back to the textbook implementation (slower,
-  larger memory).
-
-## Hugging Face gated models
-
-Some models (e.g. `meta-llama/*`) require accepting the license and using an
-HF token:
-
-```bash
-huggingface-cli login   # paste a token from https://huggingface.co/settings/tokens
-```
-
-The token is cached at `~/.cache/huggingface/token`. **Do not** commit it.
-
-`canifinetune estimate` does **not** require download access — the curated
-metadata table covers the most popular gated models. But `canifinetune bench`
-must actually load the weights, so the token has to be set.
-
-## "No NVIDIA GPU detected"
-
-`canifinetune doctor` says no GPU even though you have one:
-
-- WSL guests don't always see the GPU; install NVIDIA's CUDA-on-WSL2 layer.
-- Headless VMs without a passed-through GPU obviously can't.
-- Some Windows users have nvidia-smi at `C:\Windows\System32\nvidia-smi.exe`
-  and it's not in PATH. Add `C:\Windows\System32` or use the full path.
-
-## Display GPU is busy
-
-Browsers (Chrome, Edge, Firefox), Discord, Windows compositor, NVIDIA overlay,
-and tools like Ollama can each take 0.5–2 GB on your display GPU. `nvidia-smi`
-shows the breakdown.
-
-Strategies:
-
-- Pass `--gpu-vram-gb <free-gb>` instead of total VRAM to the estimator.
-- Close GPU consumers before training.
-- On Windows, if you have a second GPU, set the display to that GPU in
-  Settings → System → Display → Graphics so the training GPU is unloaded.
-
-## PyTorch memory fragmentation
-
-Symptom: training fits at step 1 but OOMs at step N with "tried to allocate
-… free memory but reserved more".
-
-Fix: set `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True` before launching.
-This is opt-in upstream because it interacts poorly with some custom CUDA
-kernels, but it solves most fragmentation issues on consumer GPUs.
-
-## bf16 not supported
-
-Symptom: model loads in fp32 even though you asked for bf16.
-
-bf16 requires Ampere or newer (sm_80+). The RTX 4080 (Ada Lovelace, sm_89)
-supports it. On older cards (Volta / Turing / older Ampere consumer cards),
-fall back to `fp16`. `train.py` already auto-falls-back if
-`torch.cuda.is_bf16_supported()` is False; you can also set `base_dtype: fp16`
-in `config.yaml` explicitly.
-
-## "no nvcc" but torch CUDA works
-
-That's normal. `nvcc` is the CUDA toolkit compiler, used to build kernels from
-source. PyTorch ships pre-compiled CUDA kernels in its wheel, so you don't
-need `nvcc` to *use* torch + CUDA. You only need it to *compile* custom
-extensions like flash-attn from source.
-
-## NCCL warnings on single-GPU
-
-Some logs mention NCCL even on a single GPU. NCCL is harmless on a single
-GPU — `canifinetune` does not use it. You can ignore these messages.
+Check the run is successful and contains its model/adapter artifact. Failed saves
+remove `.saving`; they do not become successful checkpoints. Adapter evaluation
+reloads the same pinned base and applies the saved adapter; it never silently
+ignores adapter errors. These are inference artifacts, not a full resume snapshot.

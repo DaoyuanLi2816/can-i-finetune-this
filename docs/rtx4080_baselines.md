@@ -1,4 +1,8 @@
-# RTX 4080 baselines
+> Historical development/fitting evidence, preserved unchanged. Column labels
+> originally say GB but calculations use GiB. These runs are not independent
+> 0.4.0 validation or current release qualification. See validation-0.4.0.md.
+
+# Historical RTX 4080 baselines
 
 These are **real benchmark results** collected on a single RTX 4080 (16 GB).
 No numbers in this file are synthetic. If a configuration is missing, it was

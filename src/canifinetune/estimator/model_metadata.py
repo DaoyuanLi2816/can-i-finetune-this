@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import asdict, dataclass, field
+from pathlib import Path
 from typing import Any
 
 from ..utils.hf import fetch_model_config, fetch_model_parameter_count
@@ -349,6 +350,18 @@ def fetch_metadata(
         ValueError: when no metadata can be resolved and the caller did not
         provide an override.
     """
+    local = Path(model_id)
+    if local.is_dir():
+        import json
+
+        config_path = local / "config.json"
+        if not config_path.is_file():
+            raise ValueError("local model directory must contain config.json")
+        md = _from_hf_config(model_id, json.loads(config_path.read_text(encoding="utf-8")))
+        if md is None:
+            raise ValueError("unsupported local causal model config")
+        md.source = "local-config"
+        return md
     if override:
         return _from_spec(model_id, override, source="override")
     if model_id in _OVERRIDES:
@@ -356,13 +369,14 @@ def fetch_metadata(
     if model_id in KNOWN_MODELS:
         return _from_spec(model_id, KNOWN_MODELS[model_id], source="known")
 
-    if use_network:
-        cfg = fetch_model_config(model_id, revision=revision)
-        if cfg is not None:
-            exact_total = fetch_model_parameter_count(model_id, revision=revision)
-            md = _from_hf_config(model_id, cfg, exact_total_params=exact_total)
-            if md is not None:
-                return md
+    cfg = fetch_model_config(model_id, revision=revision, local_files_only=not use_network)
+    if cfg is not None:
+        exact_total = (
+            fetch_model_parameter_count(model_id, revision=revision) if use_network else None
+        )
+        md = _from_hf_config(model_id, cfg, exact_total_params=exact_total)
+        if md is not None:
+            return md
 
     raise ValueError(
         f"Cannot resolve metadata for {model_id!r}. Either pass --override "

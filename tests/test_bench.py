@@ -93,6 +93,7 @@ def test_batch_failure_marks_result_failed(monkeypatch):
     monkeypatch.setitem(sys.modules, "torch", SimpleNamespace(cuda=fake_cuda))
     monkeypatch.setattr(runner, "_gpu_snapshot_dict", lambda: {"total_vram_gb": 16})
     monkeypatch.setattr(runner, "_torch_env", lambda: {})
+    monkeypatch.setattr(runner, "effective_configuration", lambda *args: {})
     monkeypatch.setattr(runner, "_safe_clear", lambda: None)
     monkeypatch.setattr(runner, "reset_peak", lambda: None)
     monkeypatch.setattr(runner, "snapshot", _snapshot)

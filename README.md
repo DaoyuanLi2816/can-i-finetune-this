@@ -1,234 +1,171 @@
-<p align="center">
-  <img src="https://raw.githubusercontent.com/DaoyuanLi2816/can-i-finetune-this/main/docs/banner.svg" alt="canifinetune — Can I fine-tune this LLM on my GPU? Estimate up front, run local benchmarks, get ready-to-run LoRA/QLoRA recipes for 12–24 GB consumer GPUs." width="880">
-</p>
-
-<div align="center">
+# canifinetune
 
 [![CI](https://github.com/DaoyuanLi2816/can-i-finetune-this/actions/workflows/ci.yml/badge.svg)](https://github.com/DaoyuanLi2816/can-i-finetune-this/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/canifinetune.svg)](https://pypi.org/project/canifinetune/)
-[![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org)
-[![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
-</div>
+**A single-GPU LLM fine-tuning preflight: estimate a memory budget, inspect the
+assumptions, generate a recipe, then measure a bounded local run.**
 
-**Estimate, benchmark, and generate fine-tuning recipes for LLMs on consumer GPUs.**
+Start from PyPI. Core needs no PyTorch and never downloads model weights:
 
-![can-i-finetune-this architecture](https://raw.githubusercontent.com/DaoyuanLi2816/can-i-finetune-this/main/docs/architecture.png)
+```console
+python -m pip install canifinetune==0.4.0
+canifinetune estimate --model Qwen/Qwen2.5-1.5B-Instruct --method qlora --gpu-vram-gb 16 --seq-len 2048 --offline
+canifinetune demo
+```
 
-You have one consumer-grade NVIDIA GPU. You want to fine-tune an open-weight LLM
-with LoRA or QLoRA, but you do not want to download 14 GB of weights just to
-discover that your 12 GB / 16 GB / 24 GB card OOMs on step 1.
+The first command produces an **8.420 GiB planning budget**, `yes` against 16 GiB,
+with a heuristic `medium` evidence grade. `demo` prints
+[http://127.0.0.1:8765](http://127.0.0.1:8765): choose a catalogue model, training
+configuration and total/currently-free memory, inspect the breakdown, and copy
+CLI commands. It calls the same Python estimator. No account, telemetry, uploads
+or UI dependencies. This is a local application; it is not a hosted service.
 
-`canifinetune` answers, before you spend the disk space and the time:
+A budget is not a guarantee that training will fit. All `*_gb` JSON fields use
+**GiB**, including historical files. `confidence` is not a calibrated probability
+or error interval. Historical RTX 4080 measurements informed the coefficients;
+[prospective validation](docs/validation-0.4.0.md) reports fresh observations
+separately, including substantial overestimates. No cross-GPU accuracy claim.
 
-1. Can I fine-tune this model?
-2. About how much VRAM will it use?
-3. What batch size / sequence length / LoRA rank / quantization should I use?
-4. If I can't, how should I downsize?
-5. Is there local benchmark evidence for that answer?
-6. Can I get a ready-to-run Hugging Face + PEFT + TRL training script for that config?
+## From estimate to an executable recipe
 
-It is a single Python package with a CLI:
-
-```bash
+```console
 canifinetune doctor
-canifinetune estimate --model Qwen/Qwen2.5-1.5B-Instruct --method qlora --gpu-vram-gb 16 --seq-len 2048 --micro-batch-size 1 --lora-rank 16
-canifinetune recommend --model Qwen/Qwen2.5-1.5B-Instruct --gpu-vram-gb 16
-canifinetune bench    --model sshleifer/tiny-gpt2 --method lora --steps 3
-canifinetune calibrate --benchmarks benchmarks/results
-canifinetune recipe   --model Qwen/Qwen2.5-1.5B-Instruct --method qlora --output recipes/qwen2.5-1.5b-qlora-4080
-canifinetune report   --benchmarks benchmarks/results --out report.md
-canifinetune compare  --benchmarks benchmarks/results --out compare.md
+canifinetune recommend --model Qwen/Qwen2.5-0.5B-Instruct --gpu-vram-gb 16 --offline --top-k 3
+canifinetune recipe --model Qwen/Qwen2.5-0.5B-Instruct --method qlora --gpu-vram-gb 16 --seq-len 256 --max-steps 2 --grad-accum 1 --output my-recipe
 ```
 
-What `canifinetune estimate` actually prints:
+Estimate/recommend/recipe use metadata only. Known catalogue models work offline;
+other Hub models may fetch config and parameter metadata. `bench` and `train.py`
+load weights and actually run training. Gated models require the user's own
+access approval. Remote model code is never enabled.
 
-```text
-+-------- Qwen/Qwen2.5-1.5B-Instruct  (qlora) ---------+
-| feasible: YES    ratio = 0.53    confidence = medium |
-+------------------------------------------------------+
-      Memory breakdown (GB)
-+--------------------------------+
-| Component             |  Value |
-|-----------------------+--------|
-| static model          |  1.496 |
-| quantization overhead |  0.072 |
-| trainable params      | 4.4 MB |
-| gradients             |  0.016 |
-| optimizer states      |  0.010 |
-| activations           |  0.689 |
-| logits / loss         |  4.057 |
-| CUDA / fragmentation  |  1.280 |
-| safety margin         |  0.800 |
-| total                 |  8.420 |
-+--------------------------------+
+For CUDA training, use a Python 3.12 environment and a driver compatible with
+PyTorch's CUDA 12.4 wheel. Install the qualified stack:
+
+```console
+python -m pip install torch==2.6.0 --index-url https://download.pytorch.org/whl/cu124
+python -m pip install -c https://raw.githubusercontent.com/DaoyuanLi2816/can-i-finetune-this/v0.4.0/constraints/train-recommended.txt "canifinetune[train]==0.4.0"
+python my-recipe/train.py --config my-recipe/config.yaml
+python my-recipe/eval_smoke.py --output-dir my-recipe/output --max-new-tokens 8
 ```
 
-On a real RTX 4080 this exact config peaks at 7.10 GB reserved — the
-estimate lands ~1.3 GB above it, on the safe side, instead of promising
-3 GB and OOM-ing. Two terms most static estimators miss do the work here:
-the **logits / cross-entropy chain** (`seq × vocab × ~14 B`; 4.1 GB for
-Qwen's 152k vocab at seq 2048, and gradient checkpointing does *not* remove
-it) and the **fp32 upcast of embeddings/norms** that
-`prepare_model_for_kbit_training` performs under QLoRA. Every coefficient
-was fitted against measured `torch.cuda` peaks — see
-`docs/rtx4080_baselines.md` — and `canifinetune bench` / `calibrate` can
-still ground the estimate on *your* machine.
+These are individual commands usable in PowerShell or a Linux shell. Environment
+creation/activation differs by platform; see the complete
+[PyPI-only walkthrough](docs/quickstart.md). Native Windows CPU/CUDA is verified;
+Linux CPU runs in CI. WSL GPU qualification is not claimed for this release.
 
----
+An adapter is saved under `output/adapter`; a full fine-tune under `output/model`.
+`output/run.json` records requested/effective configuration, data statistics,
+software, resolved model revision, outcome and allocator peaks. Saving is staged;
+failed runs cannot be evaluated as successful. A non-empty output directory is
+rejected. We save inference artifacts, not optimizer/RNG state for full resume.
 
-## Install
+## Offline training smoke without downloading a model
 
-`canifinetune` runs in two layers:
+Install the training extra with a CPU torch wheel (or the CUDA stack above), then:
 
-| Layer | Install | What you get |
-| --- | --- | --- |
-| Core (estimate / recommend / recipe / report) | `pip install canifinetune` | All CLI commands. No PyTorch required. |
-| Training (bench / real fine-tuning) | `pip install canifinetune[train]` | Adds `torch`, `transformers`, `peft`, `bitsandbytes`, `trl`, `datasets`. |
-| Reporting extras | `pip install canifinetune[report]` | Pandas/tabulate for prettier tables. |
-| Development | `pip install canifinetune[dev]` | pytest, ruff, mypy. |
-
-If you use `uv`:
-
-```bash
-uv venv
-uv pip install -e ".[dev,report]"
-# Add training deps when you want to run benchmarks:
-uv pip install -e ".[dev,train,report]"
+```console
+canifinetune smoke-model --output tiny-local
+canifinetune recipe --model tiny-local --method lora --device cpu --base-dtype fp32 --optimizer adamw_torch --seq-len 128 --max-steps 2 --grad-accum 1 --offline --output cpu-recipe
+python cpu-recipe/train.py --config cpu-recipe/config.yaml
+python cpu-recipe/eval_smoke.py --output-dir cpu-recipe/output --max-new-tokens 2
 ```
 
-PyTorch should generally be installed with the CUDA wheel that matches your driver,
-e.g.
+This creates a random model locally, executes real updates, saves and reloads it.
+It demonstrates pipeline behavior, not useful language capability.
 
-```bash
-uv pip install torch --index-url https://download.pytorch.org/whl/cu124
+## Supervision and configuration
+
+Recipes use one Transformers Trainer backend, independently of whether TRL is
+installed. Default `loss_mode: all` preserves the full-token training objective.
+Instruction records have `instruction`, optional `input`, and a non-empty
+`output`. Chat records preserve an optional initial system message and every
+alternating user/assistant turn through the tokenizer's native chat template.
+Other role arrangements/tools/multimodal content are rejected explicitly.
+
+`--loss-mode assistant` uses offset mappings for instruction completions and
+native `{% generation %}` token masks for chat. Templates without those masks
+are rejected; there is no string-search fallback. `--truncation error` is the
+default. Explicit `right` truncation must preserve response supervision after the
+causal label shift. Padding is masked by position; genuine EOS survives when
+PAD and EOS share an ID. Invalid rows report their line and stop the run.
+See the generated `dataset_format.md` and [training contract](docs/training.md).
+
+Dtype, attention, quantization, target scope, optimizer, checkpointing and backend
+share a validated configuration. Invalid/unknown settings fail; attention or
+dtype are never removed in a broad exception retry. CPU requires explicit fp32.
+Unsupported BF16 requires a user-selected alternative and a new estimate.
+Full FP16 weight training is rejected. Custom LoRA target lists outside supported
+scopes lack a reliable static model and are rejected by estimation/recipe.
+
+Liger recipes remain **experimental** (`--liger`, optional Linux/Triton dependency).
+Their stock logits allocation is retained as an explicit conservative planning
+proxy with low confidence; stock calibration is not applied. Fused loss and Flash
+Attention accuracy/CUDA compatibility were not qualified here. Bench rejects
+Liger until a matching measurement path is qualified.
+
+## Measure, compare and share evidence
+
+```console
+canifinetune bench --model Qwen/Qwen2.5-0.5B-Instruct --method qlora --seq-len 256 --optimizer adamw_torch --steps 3 --out-dir measurements
+canifinetune report --benchmarks measurements --out report.md
+canifinetune compare --benchmarks measurements --out compare.md
+canifinetune calibrate --benchmarks measurements --out calibration.json
+canifinetune evidence-export --input measurements/YOUR_RESULT.json
 ```
 
-See `docs/troubleshooting.md` for Windows / WSL / bitsandbytes specifics.
+A benchmark covers model loading, first forward/backward, first optimizer-state
+allocation and the requested short probe. Allocated and reserved peaks describe
+this process's torch allocator; device free/total memory are a different scope.
+OOM records are boundaries without an exact peak, and missing measurements are
+never replaced with zero. Safety is separate from the process peak proxy.
+Use `--available-vram-gb` for a currently busy device while retaining the actual
+`--gpu-vram-gb` total; memory allowances are not recalculated from the free budget.
 
----
+Evidence export is explicit opt-in, preview-first and local. It removes personal
+paths, detailed exceptions, model identity, GPU UUIDs and unknown fields by
+allowlist. `--include-public-model` separately opts into a public Hub identifier
+and revision. Review the JSON before sharing; never include private samples or
+credentials. [Contribution instructions](CONTRIBUTING.md) explain manual issue/PR
+submission. Community uploads remain unreviewed and cannot enter calibration or
+independent accuracy summaries automatically. There are no automatic uploads.
 
-## Quickstart
+Calibration is a fit to supplied data, with configuration profiles, estimator
+version, family/method and GPU-capacity checks. It is not independent validation.
+Historical raw observations remain unchanged; old calibration caches need
+regeneration. The report defines success/error and feasibility denominators,
+excludes historical fits/community uploads, and reports insufficient samples
+instead of inventing missing rates.
 
-```bash
-# 1. See what your machine looks like
-canifinetune doctor
+## Compatibility and development
 
-# 2. Ask if a model fits on your card
-canifinetune estimate \
-  --model Qwen/Qwen2.5-1.5B-Instruct \
-  --method qlora \
-  --gpu-vram-gb 16 \
-  --seq-len 2048 \
-  --micro-batch-size 1 \
-  --lora-rank 16
+Core: Python 3.10–3.14, no torch. Qualified training: Python 3.12, torch 2.6,
+Transformers 4.57.6 / PEFT 0.18.1 / Accelerate 1.12 (minimum combination), or
+Transformers 5.8.1 / PEFT 0.19.1 / Accelerate 1.13 (recommended), bitsandbytes
+0.49.2. [Constraints](constraints) reproduce both. Newer upstream releases are
+not silently included in the supported range. TRL/datasets are no longer needed.
 
-# 3. Have it search for a feasible config
-canifinetune recommend --model Qwen/Qwen2.5-1.5B-Instruct --gpu-vram-gb 16
-
-# 4. Run a tiny real benchmark (downloads sshleifer/tiny-gpt2, ~5 MB)
-canifinetune bench --model sshleifer/tiny-gpt2 --method lora --steps 3
-
-# 5. Generate a ready-to-run training recipe
-canifinetune recipe \
-  --model Qwen/Qwen2.5-1.5B-Instruct \
-  --method qlora \
-  --seq-len 2048 \
-  --output recipes/qwen2.5-1.5b-qlora-4080
+```console
+python -m pip install -e ".[dev]"
+ruff check .
+ruff format --check .
+mypy src
+pytest -q -m "not training" --cov=canifinetune --cov-fail-under=70
+python scripts/check_generated.py
 ```
 
----
+After installing a qualified training stack: `pytest -q tests/integration`.
+Core coverage excludes optional torch runtime/smoke creation; real training
+behavior has a separate CI job. CI also installs wheels outside the checkout.
+[Release verification](docs/releasing.md) preserves the same tested candidate
+files through GitHub Release and PyPI Trusted Publishing, then checks public
+hashes and installation.
 
-## What's different from `accelerate estimate-memory`?
+Scope: one consumer NVIDIA GPU, causal HF models, full/tiny training and
+LoRA/QLoRA. Distributed training, remote code and automatic gated-model approval
+are unsupported. See [changelog](CHANGELOG.md), [troubleshooting](docs/troubleshooting.md)
+and [historical development baselines](docs/rtx4080_baselines.md).
 
-`accelerate estimate-memory` tells you how much memory **loading** a model takes.
-That is not enough to know whether you can **train** it.
-
-This project tries to answer the harder question. It models:
-
-- Model weights, in fp32 / fp16 / bf16 / int8 / NF4 + double-quant —
-  including the fact that QLoRA only quantizes the Linear layers while
-  embeddings / lm_head / norms are upcast to fp32 by
-  `prepare_model_for_kbit_training` (4 GB on an untied 7B!)
-- The logits / cross-entropy chain (`seq × batch × vocab × ~14 B`) — the
-  single biggest training buffer for modern 128k–152k-vocab models, and
-  one that gradient checkpointing does not touch
-- LoRA / QLoRA trainable parameter count for typical `target_modules`
-- Gradients only for trainable parameters
-- AdamW vs 8-bit / paged AdamW optimizer states
-- Activations as a function of `seq_len`, `batch_size`, `hidden_size`,
-  `intermediate_size`, `num_layers`, with and without gradient checkpointing,
-  with coefficients fitted to measured peaks on real hardware
-- A fragmentation / CUDA / buffer safety margin
-- A feasibility decision against your actual GPU
-- Concrete degradation suggestions when not feasible
-- Exact Hub safetensors parameter counts and MoE-aware weight/activation
-  accounting (`num_local_experts` vs `num_experts_per_tok`)
-
-Estimates are **always** marked with an `assumptions` block and a `confidence`
-level, because activation memory in particular is hard to predict statically.
-Run `canifinetune bench` and `canifinetune calibrate` to ground them in real
-measurements on your machine.
-
----
-
-## RTX 4080 baselines
-
-`docs/rtx4080_baselines.md` contains real measurements collected on a single
-RTX 4080 (16 GB). These are not synthetic. If a configuration was not run, the
-table says "not run", not a guessed number. The same runs are pinned as
-regression fixtures in `tests/test_estimator_accuracy.py`, so the estimator
-cannot silently drift away from measured reality.
-
-Highlights (more in the doc):
-
-| model | method | seq_len | estimated | measured peak | tok/sec |
-| --- | --- | --- | --- | --- | --- |
-| `Qwen/Qwen2.5-0.5B-Instruct` | qlora | 1024 | 5.01 GB | 3.30 GB | 3337 |
-| `Qwen/Qwen2.5-1.5B-Instruct` | qlora | 1024 | 6.05 GB | 4.36 GB | 2483 |
-| `Qwen/Qwen2.5-1.5B-Instruct` | qlora | 2048 | 8.42 GB | 7.10 GB | 2327 |
-| `Qwen/Qwen2.5-1.5B-Instruct` | qlora | 4096 | 13.16 GB | 13.56 GB | 1662 |
-| `Qwen/Qwen2.5-1.5B-Instruct` | qlora (no ckpt) | 1024 | 10.75 GB | 9.55 GB | 3003 |
-| `Qwen/Qwen2.5-3B-Instruct` | qlora | 1024 | 7.26 GB | 5.54 GB | 1303 |
-| `Qwen/Qwen2.5-7B-Instruct` | qlora | 1024 | 12.43 GB | 11.23 GB | 923 |
-
----
-
-## Repository layout
-
-```
-src/canifinetune/        # package code (estimator, bench, recipes, reports, cli)
-benchmarks/              # configs/, results/ (JSON), calibration/
-docs/                    # design, memory model, troubleshooting
-examples/                # end-to-end recipe folders
-tests/                   # pytest tests (CPU-only, no large downloads)
-scripts/                 # helper scripts for collecting baselines
-.github/workflows/       # CI (ruff + pytest on CPU)
-```
-
----
-
-## Roadmap
-
-The current scope is "single consumer GPU, single node, LoRA / QLoRA, causal LM,
-Hugging Face stack". Possible directions, none committed:
-
-- DeepSpeed ZeRO and FSDP estimation for multi-GPU setups
-- Heuristics for sequence-classification / encoder-decoder training
-- Throughput modeling (tokens / sec), not just feasibility
-- Auto-tuning of `gradient_accumulation_steps` for a target effective batch size
-- A web UI on top of the CLI
-
-Generated recipes can opt into current TRL Liger kernels with `--liger`; the
-static estimate remains conservative and continues to model the stock
-logits/loss path.
-
-Contributions welcome.
-
-See [CHANGELOG.md](CHANGELOG.md) for release notes.
-
----
-
-## License
-
-MIT. See `LICENSE`.
+MIT. Maintainer: Daoyuan Li.

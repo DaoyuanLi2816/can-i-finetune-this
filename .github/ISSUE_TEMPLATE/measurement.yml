@@ -1,0 +1,31 @@
+name: Measurement evidence
+description: Manually share a reviewed, redacted schema-2 measurement.
+title: "[measurement] "
+body:
+  - type: markdown
+    attributes:
+      value: "Run evidence-export, preview the JSON and read CONTRIBUTING.md. Uploading evidence does not make it maintainer-verified. Never attach credentials, private samples or unreviewed raw logs."
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Redacted evidence JSON
+      description: Paste the validated share.json or attach it manually. All memory values are GiB.
+      render: json
+    validations:
+      required: true
+  - type: textarea
+    id: workload
+    attributes:
+      label: Workload and outcome
+      description: State steps, actual hardware/software, configuration changes and whether this was synthetic or real data. No personal paths.
+    validations:
+      required: true
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Sharing review
+      options:
+        - label: I reviewed the exported fields and am allowed to share them.
+          required: true
+        - label: I understand this submission remains unreviewed until a maintainer verifies it.
+          required: true

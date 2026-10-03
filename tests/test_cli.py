@@ -74,10 +74,11 @@ def test_cli_estimate_unknown_model_errors_without_override(runner):
             "--lora-rank",
             "8",
             "--json",
+            "--offline",
         ],
     )
-    # Either it errored cleanly, or it actually fetched a config — both are fine.
-    assert res.exit_code in {0, 2}
+    assert res.exit_code == 2
+    assert "Cannot resolve metadata" in res.stderr
 
 
 def test_cli_recommend(runner):
@@ -224,3 +225,13 @@ def test_cli_compare_with_one_result(runner, tmp_path: Path):
     assert res.exit_code == 0
     text = out.read_text(encoding="utf-8")
     assert "test/tiny-llama" in text
+
+
+def test_cli_missing_training_dependency_is_actionable(runner, monkeypatch, tmp_path):
+    import sys
+
+    monkeypatch.setitem(sys.modules, "torch", None)
+    outcome = runner.invoke(app, ["smoke-model", "--output", str(tmp_path / "model")])
+    assert outcome.exit_code == 2
+    assert "canifinetune[train]" in outcome.stderr
+    assert not (tmp_path / "model").exists()

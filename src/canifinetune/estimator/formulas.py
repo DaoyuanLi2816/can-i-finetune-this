@@ -18,13 +18,10 @@ References:
     0.87 GiB fp32 tied embedding), Qwen2.5-7B at 7.2 GiB (3.04 GiB packed +
     2 x 2.03 GiB fp32 untied embedding/lm_head).
 
-Coefficients were calibrated against measured peaks on an RTX 4080 (16 GB,
-torch 2.6 / transformers 5.8 / peft 0.19 / bitsandbytes 0.49) across
-Qwen2.5-0.5B/1.5B/3B/7B, seq_len 512-4096, batch 1-2, ckpt on/off, LoRA and
-QLoRA. The static component of each estimate lands within about +-10% of
-``max_memory_allocated`` on those runs; the formulas intentionally err
-slightly toward over-estimation so the "feasible" verdict is conservative
-on consumer cards.
+Coefficients were developed using historical RTX 4080 measurements. Those
+measurements are fit/development evidence, not an independent accuracy test.
+The prospective validation report records new runs without refitting to them.
+Other GPU/software/model configurations remain heuristic planning estimates.
 """
 
 from __future__ import annotations
@@ -342,26 +339,35 @@ def gradients_bytes(*, trainable_params: int, grad_dtype: str = "fp32") -> float
 
 # Bytes per *trainable* parameter for the most common optimizers.
 OPTIMIZER_BYTES_PER_PARAM: dict[str, float] = {
-    # AdamW master weights (fp32) + m + v in fp32 = 12 B/param. PyTorch's default
-    # AdamW in mixed precision keeps fp32 m/v plus fp32 master weights of the
-    # *trainable* params. With LoRA the trainable set is tiny so this is fine.
+    # FP32 native states + conservative foreach update workspace.
+    # Native AdamW has no automatic fp32 master-weight copy.
     "adamw_torch": 12.0,
-    "adamw_torch_fused": 12.0,
+    "adamw_torch_fused": 8.0,
     "adamw": 12.0,
     # 8-bit AdamW from bitsandbytes: m + v in int8 + a small absmax block.
     "adamw_8bit": 2.5,
     "paged_adamw_8bit": 2.5,
     "paged_adamw_32bit": 12.0,
-    "sgd": 4.0,
+    "sgd": 0.0,
     "sgd_momentum": 8.0,
     "lion_8bit": 2.0,
     "adafactor": 4.0,
 }
 
 
-def optimizer_bytes(*, trainable_params: int, optimizer: str) -> float:
+def optimizer_bytes(
+    *, trainable_params: int, optimizer: str, parameter_dtype: str = "fp32"
+) -> float:
     """Bytes used by optimizer states for ``trainable_params``."""
     key = optimizer.lower()
+    if key in {"adamw", "adamw_torch", "adamw_torch_fused"}:
+        # Native AdamW states follow parameter dtype. It does not allocate an
+        # automatic fp32 master copy. Non-fused CUDA foreach adds a one-tensor
+        # planning allowance during the update; fused retains only two states.
+        copies = 2 if key == "adamw_torch_fused" else 3
+        return trainable_params * dtype_bytes(parameter_dtype) * copies
+    if key == "sgd":
+        return 0.0  # runtime uses SGD without momentum
     per_param = OPTIMIZER_BYTES_PER_PARAM.get(key, 12.0)
     return trainable_params * per_param
 

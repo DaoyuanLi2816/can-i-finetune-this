@@ -89,7 +89,7 @@
     <g font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
       <text x="706" y="102" font-size="14" font-weight="700" fill="#f1f5f9">Ready-to-run</text>
       <text x="706" y="120" font-size="14" font-weight="700" fill="#f1f5f9">recipes</text>
-      <text x="706" y="142" font-size="11.5" fill="#94a3b8">HF + PEFT + TRL</text>
+      <text x="706" y="142" font-size="11.5" fill="#94a3b8">HF + PEFT</text>
       <text x="706" y="158" font-size="11.5" fill="#94a3b8">training scripts</text>
       <text x="706" y="180" font-size="10.5" fill="#fcd34d" fill-opacity="0.9">one command from</text>
       <text x="706" y="195" font-size="10.5" fill="#fcd34d" fill-opacity="0.9">plan to training</text>
