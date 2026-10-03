@@ -63,3 +63,10 @@ Check the run is successful and contains its model/adapter artifact. Failed save
 remove `.saving`; they do not become successful checkpoints. Adapter evaluation
 reloads the same pinned base and applies the saved adapter; it never silently
 ignores adapter errors. These are inference artifacts, not a full resume snapshot.
+
+
+For a single unambiguously matched GPU, discovery retains both CUDA-driver and
+nvidia-smi free-memory readings and uses the lower one for a planning budget.
+These readings disagreed on the qualification host during concurrent GPU pressure;
+that observation does not prove its underlying cause. Stage snapshots label their
+CUDA-driver source. A conservative reading still cannot reserve future memory.

@@ -314,7 +314,14 @@ def train(config: RunConfig):
                 "name": torch.cuda.get_device_name(),
                 "total_gib": total / 2**30,
                 "free_before_load_gib": free / 2**30,
+                "free_memory_source": "torch.cuda.mem_get_info",
             }
+            from ..utils.gpu import probe_cuda
+
+            info = probe_cuda()
+            if len(info.gpus) == 1:
+                record["hardware"].update(info.gpus[0].to_dict())
+                record["hardware"]["free_before_load_gib"] = info.gpus[0].free_vram_gb
         tokenizer = AutoTokenizer.from_pretrained(
             config.model_id,
             revision=config.revision,

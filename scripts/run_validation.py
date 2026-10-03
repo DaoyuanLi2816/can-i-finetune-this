@@ -5,6 +5,7 @@ from pathlib import Path
 
 from canifinetune.bench.runner import BenchConfig, run_bench
 from canifinetune.estimator.memory import EstimateRequest, estimate
+from canifinetune.utils.gpu import probe_cuda
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -15,6 +16,10 @@ if __name__ == "__main__":
     import torch
 
     free, total = torch.cuda.mem_get_info()
+    info = probe_cuda()
+    if len(info.gpus) != 1:
+        raise SystemExit("not run: validation requires one unambiguous GPU")
+    free_gib = min(free / 2**30, info.gpus[0].free_vram_gb)
     config = BenchConfig(
         model_id="Qwen/Qwen2.5-0.5B-Instruct",
         revision="7ae557604adf67be50417f59c2c2f167def9a775",
@@ -32,10 +37,10 @@ if __name__ == "__main__":
     )
     prediction = estimate(
         EstimateRequest(
-            **config.training_fields(), gpu_vram_gb=total / 2**30, available_vram_gb=free / 2**30
+            **config.training_fields(), gpu_vram_gb=total / 2**30, available_vram_gb=free_gib
         )
     )
-    if free / 2**30 < max(4, prediction.memory.total_estimated_gb):
+    if free_gib < max(4, prediction.memory.total_estimated_gb):
         raise SystemExit("not run: insufficient free memory for the predeclared safe experiment")
     result = run_bench(config)
     result.provenance = {

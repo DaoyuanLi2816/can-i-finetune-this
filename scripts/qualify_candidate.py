@@ -67,6 +67,14 @@ def qualify(training=False, cuda=False, receipt=None):
             if cuda:
                 cases += [("lora", "cuda"), ("qlora", "cuda")]
             for method, device in cases:
+                if device == "cuda":
+                    from canifinetune.utils.gpu import probe_gpus_via_nvidia_smi
+
+                    gpus = probe_gpus_via_nvidia_smi()
+                    if len(gpus) != 1 or gpus[0].free_vram_gb < 1:
+                        raise SystemExit(
+                            "not run: tiny CUDA qualification requires at least 1 GiB free on one GPU"
+                        )
                 recipe = root / f"{method}-{device}"
                 generate_recipe(
                     RecipeRequest(

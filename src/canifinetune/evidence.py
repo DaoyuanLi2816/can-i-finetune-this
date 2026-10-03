@@ -132,7 +132,16 @@ def export_evidence(data, *, include_public_model=False):
     }
     gpu = {
         key: data.get("gpu", {}).get(key)
-        for key in ("name", "total_vram_gb", "free_vram_gb", "driver_version", "compute_capability")
+        for key in (
+            "name",
+            "total_vram_gb",
+            "free_vram_gb",
+            "driver_version",
+            "compute_capability",
+            "free_memory_source",
+            "cuda_reported_free_gb",
+            "nvidia_smi_reported_free_gb",
+        )
         if data.get("gpu", {}).get(key) is not None
     }
     success = data.get("status") == "success"

@@ -9,7 +9,11 @@ updates. Each case ran in an isolated process. No coefficients were fitted to it
 Hardware: one native Windows RTX 4080, total 15.992 GiB, driver 596.49,
 compute capability 8.9. Python 3.12.13, torch 2.6.0+cu124, Transformers 5.8.1,
 PEFT 0.19.1, Accelerate 1.13.0, bitsandbytes 0.49.2. Free memory is recorded
-per run. Budget: one process, at most 1.5 GB new weights (988,097,824-byte model),
+per run from the CUDA-driver API; nvidia-smi was not captured for each of these
+pre-release observations. Their feasibility counts use that original driver-view
+budget. Final release discovery additionally records nvidia-smi and conservatively
+uses the lower reading when there is an unambiguous single-GPU match. Historical
+fields are not rewritten to apply that later policy. Budget: one process, at most 1.5 GB new weights (988,097,824-byte model),
 three updates per case. The compute-precision fix was enabled and actual
 configuration was checked after updates. Source package fingerprints identify
 these pre-release observations; exact final-wheel qualification is a separate

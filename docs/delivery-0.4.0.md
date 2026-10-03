@@ -53,7 +53,7 @@ Calibration schema 3 separates compatible fits from prospective/community eviden
 The original 70% core coverage gate is retained; optional torch runtime has actual
 CPU integration and candidate CUDA qualification rather than fabricated core coverage.
 
-No-torch Python 3.12 core: 100 tests passed,
+No-torch Python 3.12 core: 101 tests passed,
 ruff/format/mypy/generated Python checks passed. Minimum and recommended CPU
 stacks each passed 13 real integration tests. Four bounded prospective GPU
 observations succeeded; predictions are unchanged from 0.3.0 and conservatively
@@ -70,3 +70,7 @@ confirmed divergent processing paths were removed regardless of that import resu
 
 Implementation, candidate qualification, release and public-install verification
 are in progress. No new version has been released yet.
+
+GPU-pressure diagnosis retained disagreeing CUDA-driver/nvidia-smi readings;
+single-device budgets now use the lower reading. The interrupted extra repeat
+revealed this safeguard gap; it was not counted as an OOM or successful sample.
