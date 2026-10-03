@@ -11,6 +11,7 @@ import typer
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
+from typer.core import TyperGroup
 
 from . import __version__
 from .utils.logging import get_logger, to_json
@@ -30,7 +31,18 @@ console = Console()
 err_console = Console(stderr=True)
 log = get_logger("cli")
 
+
+class UserErrorGroup(TyperGroup):
+    def invoke(self, ctx):
+        try:
+            return super().invoke(ctx)
+        except (ValueError, OSError) as exc:
+            err_console.print(f"error: {exc}", markup=False)
+            raise typer.Exit(2) from exc
+
+
 app = typer.Typer(
+    cls=UserErrorGroup,
     name="canifinetune",
     help="Estimate, benchmark, and generate fine-tuning recipes for LLMs on consumer GPUs.",
     no_args_is_help=True,
@@ -94,7 +106,7 @@ def cmd_doctor(
     for g in cuda.get("gpus", []):
         table.add_row(
             f"GPU {g['index']}",
-            f"{g['name']}  {g['total_vram_gb']:.2f} GB total / {g['free_vram_gb']:.2f} GB free  "
+            f"{g['name']}  {g['total_vram_gb']:.2f} GiB total / {g['free_vram_gb']:.2f} GiB free  "
             f"(cc {g['compute_capability']}, driver {g['driver_version']})",
         )
     console.print(table)
@@ -157,6 +169,10 @@ def cmd_estimate(
     override_json: Path | None = typer.Option(
         None, "--override-json", help="Path to JSON with arch override."
     ),
+    available_vram_gb: float | None = typer.Option(None, "--available-vram-gb", min=0.001),
+    offline: bool = typer.Option(False, "--offline"),
+    revision: str = typer.Option("main", "--revision"),
+    loss_backend: str = typer.Option("stock", "--loss-backend"),
     json_out: bool = typer.Option(False, "--json"),
 ) -> None:
     """Static memory + feasibility estimate."""
@@ -178,6 +194,11 @@ def cmd_estimate(
 
     req = EstimateRequest(
         model_id=model,
+        available_vram_gb=available_vram_gb,
+        use_network=not offline,
+        local_files_only=offline,
+        revision=revision,
+        loss_backend=loss_backend,
         method=method,
         gpu_vram_gb=gpu_vram_gb,
         seq_len=seq_len,
@@ -216,12 +237,12 @@ def _print_estimate(est) -> None:
     )
 
     mem = est.memory
-    table = Table(title="Memory breakdown (GB)", show_lines=False)
+    table = Table(title="Memory breakdown (GiB)", show_lines=False)
     table.add_column("Component", style="bold")
     table.add_column("Value", justify="right")
     table.add_row("static model", f"{mem.static_model_gb:.3f}")
     table.add_row("quantization overhead", f"{mem.quantization_overhead_gb:.3f}")
-    table.add_row("trainable params", f"{mem.trainable_params_mb:.1f} MB")
+    table.add_row("trainable params", f"{mem.trainable_params_mb:.1f} million")
     table.add_row("gradients", f"{mem.gradients_gb:.3f}")
     table.add_row("optimizer states", f"{mem.optimizer_gb:.3f}")
     table.add_row("activations", f"{mem.activations_gb:.3f}")
@@ -245,7 +266,7 @@ def _print_estimate(est) -> None:
         table = Table(title="Suggested degradations", show_lines=False)
         table.add_column("#")
         table.add_column("Change")
-        table.add_column("Est. GB", justify="right")
+        table.add_column("Est. GiB", justify="right")
         table.add_column("Feasible")
         for i, s in enumerate(steps, 1):
             table.add_row(
@@ -267,6 +288,7 @@ def cmd_recommend(
     model: str = typer.Option(..., "--model"),
     gpu_vram_gb: float = typer.Option(..., "--gpu-vram-gb", min=0.001),
     top_k: int = typer.Option(5, "--top-k", min=1),
+    offline: bool = typer.Option(False, "--offline"),
     json_out: bool = typer.Option(False, "--json"),
     override_json: Path | None = typer.Option(None, "--override-json"),
 ) -> None:
@@ -279,7 +301,11 @@ def cmd_recommend(
 
     try:
         recs = recommend_configs(
-            model_id=model, gpu_vram_gb=gpu_vram_gb, top_k=top_k, override=override
+            model_id=model,
+            gpu_vram_gb=gpu_vram_gb,
+            top_k=top_k,
+            use_network=not offline,
+            override=override,
         )
     except ValueError as e:
         err_console.print(f"[red]error:[/red] {e}")
@@ -294,7 +320,7 @@ def cmd_recommend(
         return
 
     table = Table(
-        title=f"Top {len(recs)} configurations for {model} on {gpu_vram_gb} GB", show_lines=False
+        title=f"Top {len(recs)} configurations for {model} on {gpu_vram_gb} GiB", show_lines=False
     )
     table.add_column("#")
     table.add_column("method")
@@ -305,7 +331,7 @@ def cmd_recommend(
     table.add_column("ckpt")
     table.add_column("quant")
     table.add_column("opt")
-    table.add_column("est GB", justify="right")
+    table.add_column("est GiB", justify="right")
     table.add_column("feasible")
     for i, r in enumerate(recs, 1):
         req = r.estimate.request
@@ -348,6 +374,9 @@ def cmd_bench(
     attention_implementation: str = typer.Option("sdpa", "--attn"),
     forward_only: bool = typer.Option(False, "--forward-only"),
     out_dir: Path = typer.Option(Path("benchmarks/results"), "--out-dir"),
+    device: str = typer.Option("cuda", "--device"),
+    offline: bool = typer.Option(False, "--offline"),
+    revision: str = typer.Option("main", "--revision"),
     json_out: bool = typer.Option(False, "--json"),
 ) -> None:
     """Run a local smoke benchmark and save a result JSON."""
@@ -356,6 +385,9 @@ def cmd_bench(
 
     cfg = BenchConfig(
         model_id=model,
+        device=device,
+        local_files_only=offline,
+        revision=revision,
         method=method,
         seq_len=seq_len,
         micro_batch_size=micro_batch_size,
@@ -391,9 +423,9 @@ def _print_bench_summary(result, path: Path) -> None:
             f"file: {path}\n"
             f"model: {result.config.model_id} ({result.model_family})\n"
             f"method: {result.method}  seq_len: {result.config.seq_len}  bs: {result.config.micro_batch_size}\n"
-            f"peak reserved: {measured.get('peak_reserved_gb', '-')} GB  "
-            f"peak allocated: {measured.get('peak_allocated_gb', '-')} GB\n"
-            f"estimated total: {result.estimated_total_gb:.2f} GB\n"
+            f"peak reserved: {measured.get('peak_reserved_gb', '-')} GiB  "
+            f"peak allocated: {measured.get('peak_allocated_gb', '-')} GiB\n"
+            f"estimated total: {result.estimated_total_gb if result.estimated_total_gb is not None else 'unknown'} GiB\n"
             f"avg step: {result.avg_step_time_s} s  tokens/sec: {result.tokens_per_second}",
             title="bench",
         )
@@ -478,8 +510,17 @@ def cmd_recipe(
     use_liger_kernel: bool = typer.Option(
         False,
         "--liger/--no-liger",
-        help="Use Liger kernels in generated TRL recipes.",
+        help="Experimental Liger kernels in Transformers; stock memory proxy remains.",
     ),
+    loss_mode: str = typer.Option(
+        "all",
+        "--loss-mode",
+        help="all | assistant; native generation masks required for assistant chat loss",
+    ),
+    truncation: str = typer.Option("error", "--truncation", help="error | right"),
+    device: str = typer.Option("cuda", "--device"),
+    offline: bool = typer.Option(False, "--offline"),
+    revision: str = typer.Option("main", "--revision"),
     gpu_vram_gb: float = typer.Option(16.0, "--gpu-vram-gb", min=0.001),
     output: Path = typer.Option(..., "--output"),
     force: bool = typer.Option(
@@ -491,6 +532,11 @@ def cmd_recipe(
 
     req = RecipeRequest(
         model_id=model,
+        loss_mode=loss_mode,
+        truncation=truncation,
+        device=device,
+        local_files_only=offline,
+        revision=revision,
         method=method,
         seq_len=seq_len,
         micro_batch_size=micro_batch_size,
@@ -565,6 +611,62 @@ def cmd_compare(
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(content, encoding="utf-8")
     console.print(f"wrote {out} ({len(files)} result(s))")
+
+
+@app.command("demo")
+def cmd_demo(port: int = typer.Option(8765, "--port", min=1, max=65535)):
+    """Serve a loopback interactive estimator using the same Python core."""
+    from .demo import serve
+
+    serve(port)
+
+
+@app.command("smoke-model")
+def cmd_smoke_model(output: Path = typer.Option(..., "--output")):
+    """Create a tiny random model/tokenizer locally for offline qualification."""
+    from .training.smoke import create_smoke_model
+
+    try:
+        create_smoke_model(output)
+    except ImportError as exc:
+        err_console.print(
+            f"Missing training dependency: {exc}. Install canifinetune[train].", markup=False
+        )
+        raise typer.Exit(2) from exc
+    console.print(f"created tiny random model: {output}")
+
+
+@app.command("evidence-export")
+def cmd_evidence_export(
+    input_path: Path = typer.Option(..., "--input", exists=True, dir_okay=False),
+    out: Path | None = typer.Option(None, "--out"),
+    include_public_model: bool = typer.Option(False, "--include-public-model"),
+):
+    """Preview/export redacted benchmark JSON. Never uploads anything."""
+    from .evidence import export_evidence
+
+    data = export_evidence(
+        json.loads(input_path.read_text(encoding="utf-8")),
+        include_public_model=include_public_model,
+    )
+    text = json.dumps(data, indent=2, allow_nan=False)
+    if out:
+        with out.open("x", encoding="utf-8") as handle:
+            handle.write(text + "\n")
+        console.print(f"wrote {out}; preview before submitting manually")
+    else:
+        print(text)
+
+
+@app.command("evidence-validate")
+def cmd_evidence_validate(
+    input_path: Path = typer.Option(..., "--input", exists=True, dir_okay=False),
+):
+    """Validate evidence as data, without executing attached commands."""
+    from .evidence import SharedEvidence
+
+    SharedEvidence.model_validate_json(input_path.read_text(encoding="utf-8"))
+    console.print("valid evidence schema; upload is not maintainer verification")
 
 
 def main() -> None:

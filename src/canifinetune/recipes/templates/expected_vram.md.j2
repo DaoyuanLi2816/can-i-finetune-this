@@ -19,15 +19,15 @@ Numbers are **predictions**, not measurements. Real VRAM may differ; run
 | optimizer | {{ optimizer }} |
 | gradient_checkpointing | {{ gradient_checkpointing }} |
 | attention impl | {{ attention_implementation }} |
-| target GPU | {{ gpu_vram_gb }} GB |
+| target GPU | {{ gpu_vram_gb }} GiB |
 
 ## Breakdown
 
-| Component | GB |
+| Component | GiB |
 | --- | --- |
 | static weights | {{ "%.3f"|format(estimate_memory.static_model_gb) }} |
 | quantization overhead | {{ "%.3f"|format(estimate_memory.quantization_overhead_gb) }} |
-| trainable parameters | {{ "%.1f"|format(estimate_memory.trainable_params_mb) }} MB |
+| trainable parameters | {{ "%.1f"|format(estimate_memory.trainable_params_mb) }} million params |
 | gradients | {{ "%.3f"|format(estimate_memory.gradients_gb) }} |
 | optimizer states | {{ "%.3f"|format(estimate_memory.optimizer_gb) }} |
 | activations | {{ "%.3f"|format(estimate_memory.activations_gb) }} |
@@ -36,17 +36,18 @@ Numbers are **predictions**, not measurements. Real VRAM may differ; run
 | safety margin | {{ "%.3f"|format(estimate_memory.safety_margin_gb) }} |
 | **total estimated** | **{{ "%.3f"|format(estimate_memory.total_estimated_gb) }}** |
 
-Feasibility on a {{ gpu_vram_gb }} GB GPU: **{{ estimate_feasible }}**
+Feasibility on a {{ gpu_vram_gb }} GiB GPU: **{{ estimate_feasible }}**
 (confidence: {{ estimate_confidence }}).
 
 ## How to verify on your machine
 
-```bash
-canifinetune bench \
-  --model "{{ model_id }}" \
-  --method {{ method }} \
-  --seq-len {{ seq_len }} \
-  --micro-batch-size {{ micro_batch_size }} \
-  --lora-rank {{ lora_rank }} \
-  --steps 3
-```
+Run the generated `train.py` with the same YAML configuration. Its `run.json`
+records actual software/configuration and allocator peaks. For a synthetic bench,
+copy **all** relevant fields into BenchConfig (including alpha/dropout, revision,
+dtype, optimizer, quantization, targets, checkpointing and attention). Short sample
+data and full-length synthetic tokens are different workloads.
+
+Compare process reserved peak with total prediction **minus safety_margin_gb**;
+keep the safety allowance separate for feasibility. This is a planning heuristic,
+not a confidence interval. Liger uses a stock upper planning proxy, not a measured
+fused-loss estimate. See the package validation report for its bounded scope.

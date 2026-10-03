@@ -1,0 +1,48 @@
+{
+  "published_0.3.0": {
+    "paired_successes": 4,
+    "excluded": 0,
+    "mean_absolute_percentage_error": 46.2323729190696,
+    "median_signed_percentage_error": 46.01105831806409,
+    "signed_percentage_error_range": [
+      29.257004669779864,
+      63.65037037037037
+    ],
+    "underestimates": 0,
+    "overestimates": 4,
+    "predicted_yes_actual_oom": {
+      "numerator": 0,
+      "denominator": 4,
+      "rate": 0.0
+    },
+    "predicted_no_actual_success": {
+      "numerator": 0,
+      "denominator": 0,
+      "rate": null
+    },
+    "scope": "verified new validation cohort only; process reserved proxy excludes safety; marginal/unknown predictions excluded from feasibility denominators; short probe only"
+  },
+  "candidate_0.4.0": {
+    "paired_successes": 4,
+    "excluded": 0,
+    "mean_absolute_percentage_error": 46.2323729190696,
+    "median_signed_percentage_error": 46.01105831806409,
+    "signed_percentage_error_range": [
+      29.257004669779864,
+      63.65037037037037
+    ],
+    "underestimates": 0,
+    "overestimates": 4,
+    "predicted_yes_actual_oom": {
+      "numerator": 0,
+      "denominator": 4,
+      "rate": 0.0
+    },
+    "predicted_no_actual_success": {
+      "numerator": 0,
+      "denominator": 0,
+      "rate": null
+    },
+    "scope": "verified new validation cohort only; process reserved proxy excludes safety; marginal/unknown predictions excluded from feasibility denominators; short probe only"
+  }
+}

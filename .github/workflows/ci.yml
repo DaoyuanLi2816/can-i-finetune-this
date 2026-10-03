@@ -7,6 +7,9 @@ on:
     branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   lint-and-test:
     name: lint + test (no GPU)
@@ -34,6 +37,9 @@ jobs:
       - name: ruff format
         run: ruff format --check .
 
+      - name: Generated Python syntax and lint
+        run: python scripts/check_generated.py
+
       - name: mypy
         run: mypy src
 
@@ -42,7 +48,9 @@ jobs:
           # Tests do not require network or GPU. The model-metadata layer
           # uses a curated table for the public models referenced here.
           CANIFINETUNE_LOG_LEVEL: WARNING
-        run: pytest -ra --cov=canifinetune --cov-report=term --cov-fail-under=70
+          HF_HUB_OFFLINE: "1"
+          PYTHONUTF8: "1"
+        run: pytest -ra -m "not training" --cov=canifinetune --cov-report=term --cov-fail-under=70
 
       - name: CLI smoke
         run: |
@@ -51,5 +59,55 @@ jobs:
           canifinetune estimate \
             --model Qwen/Qwen2.5-1.5B-Instruct \
             --method qlora --gpu-vram-gb 16 --seq-len 2048 \
-            --micro-batch-size 1 --lora-rank 16 --json > /tmp/est.json
+            --micro-batch-size 1 --lora-rank 16 --offline --json > /tmp/est.json
           python -c "import json; d=json.load(open('/tmp/est.json')); assert d['feasible'] in {'yes','marginal','no'}"
+
+      - name: Build and qualify installed core wheel outside checkout
+        run: |
+          pip install build twine
+          python -m build
+          twine check dist/*
+          python -m venv "$RUNNER_TEMP/core"
+          "$RUNNER_TEMP/core/bin/pip" install dist/*.whl
+          cd "$RUNNER_TEMP"
+          "$RUNNER_TEMP/core/bin/python" "$GITHUB_WORKSPACE/scripts/qualify_candidate.py"
+
+  training:
+    name: real offline training (${{ matrix.os }}, ${{ matrix.stack }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            stack: min
+          - os: ubuntu-latest
+            stack: recommended
+          - os: windows-latest
+            stack: recommended
+    env:
+      PYTHONUTF8: "1"
+      HF_HUB_OFFLINE: "1"
+      OMP_NUM_THREADS: "2"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Install qualified CPU stack
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip
+          pip install torch==2.6.0 --index-url https://download.pytorch.org/whl/cpu
+          pip install -e ".[dev,train]" -c constraints/train-${{ matrix.stack }}.txt
+      - name: Actual update, save, reload, supervision and failure paths
+        run: pytest -q tests/integration
+      - name: Installed training wheel outside checkout
+        shell: bash
+        run: |
+          pip install build
+          python -m build --wheel
+          pip uninstall -y canifinetune
+          pip install dist/*.whl
+          cd "$RUNNER_TEMP"
+          python "$GITHUB_WORKSPACE/scripts/qualify_candidate.py" --training

@@ -79,6 +79,8 @@ def test_calibration_from_result_files(tmp_path: Path):
     calib = calibration_from_result_files([fp])
     assert calib.has_data()
     assert calib.samples[0].measured_total_gb == 4.6
+    assert calib.estimator_version == "legacy"
+    assert not calib.is_compatible(model_family="qwen2", method="qlora", gpu_vram_gb=16)
 
 
 def test_calibration_adjusts_estimate():
@@ -166,3 +168,53 @@ def test_legacy_calibration_file_is_ignored(tmp_path: Path):
 
     assert not loaded.has_data()
     assert "Legacy calibration ignored" in loaded.note
+
+
+def test_current_measurement_fit_requires_complete_matching_workload():
+    from canifinetune.configuration import TrainingConfig
+    from canifinetune.estimator.calibration import _result_to_sample, calibration_signature
+
+    config = TrainingConfig(
+        model_id="org/model", method="lora", optimizer="adamw_torch"
+    ).training_fields()
+    data = {
+        "schema_version": 2,
+        "estimator_version": "0.4.0",
+        "success": True,
+        "status": "success",
+        "config": {**config, "steps": 3},
+        "effective_configuration": config,
+        "completed_steps": 3,
+        "method": "lora",
+        "model_family": "qwen2",
+        "gpu": {"total_vram_gb": 16},
+        "measured": {"peak_allocated_gb": 3, "peak_reserved_gb": 3.4},
+        "estimated_total_gb": 3.6,
+        "estimated_breakdown": {
+            "static_model_gb": 2,
+            "gradients_gb": 0.1,
+            "optimizer_gb": 0.1,
+            "activations_gb": 0.5,
+            "logits_gb": 0.3,
+            "cuda_overhead_gb": 0.4,
+            "safety_margin_gb": 0.2,
+        },
+    }
+    sample = _result_to_sample(data)
+    assert sample is not None
+    calibration = fit_calibration_from_samples([sample])
+    assert calibration.is_compatible(
+        model_family="qwen2",
+        method="lora",
+        gpu_vram_gb=16,
+        config_signature=calibration_signature(config),
+    )
+    assert not calibration.is_compatible(
+        model_family="qwen2",
+        method="lora",
+        gpu_vram_gb=16,
+        config_signature=calibration_signature({**config, "seq_len": 512}),
+    )
+    assert _result_to_sample({**data, "completed_steps": 2}) is None
+    assert _result_to_sample({**data, "estimator_version": "0.3.0"}) is None
+    assert _result_to_sample({**data, "measured": {"peak_reserved_gb": 3.4}}) is None

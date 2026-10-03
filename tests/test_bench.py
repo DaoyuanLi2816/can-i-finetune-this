@@ -93,6 +93,7 @@ def test_batch_failure_marks_result_failed(monkeypatch):
     monkeypatch.setitem(sys.modules, "torch", SimpleNamespace(cuda=fake_cuda))
     monkeypatch.setattr(runner, "_gpu_snapshot_dict", lambda: {"total_vram_gb": 16})
     monkeypatch.setattr(runner, "_torch_env", lambda: {})
+    monkeypatch.setattr(runner, "effective_configuration", lambda *args: {})
     monkeypatch.setattr(runner, "_safe_clear", lambda: None)
     monkeypatch.setattr(runner, "reset_peak", lambda: None)
     monkeypatch.setattr(runner, "snapshot", _snapshot)
@@ -127,3 +128,19 @@ def test_batch_failure_marks_result_failed(monkeypatch):
 
     assert not result.success
     assert any("batch generation failed" in note for note in result.notes)
+
+
+def test_single_gpu_budget_preserves_disagreeing_sources(monkeypatch):
+    from canifinetune.utils import gpu
+
+    driver = gpu.GpuInfo(
+        name="RTX 4080", total_vram_gb=16, free_vram_gb=14, cuda_reported_free_gb=14
+    )
+    physical = gpu.GpuInfo(name="RTX 4080", total_vram_gb=16, free_vram_gb=2)
+    monkeypatch.setattr(gpu, "_probe_torch_cuda", lambda: gpu.CudaInfo(gpus=[driver]))
+    monkeypatch.setattr(gpu, "probe_gpus_via_nvidia_smi", lambda: [physical])
+    selected = gpu.probe_cuda().gpus[0]
+    assert selected.free_vram_gb == 2
+    assert selected.cuda_reported_free_gb == 14
+    assert selected.nvidia_smi_reported_free_gb == 2
+    assert selected.free_memory_source.startswith("min(")

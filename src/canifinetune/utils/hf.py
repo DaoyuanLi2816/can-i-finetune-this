@@ -20,7 +20,9 @@ def hf_cache_dir() -> Path:
     return Path.home() / ".cache" / "huggingface"
 
 
-def fetch_model_config(model_id: str, *, revision: str = "main") -> dict[str, Any] | None:
+def fetch_model_config(
+    model_id: str, *, revision: str = "main", local_files_only: bool = False
+) -> dict[str, Any] | None:
     """Return the model's ``config.json`` as a dict.
 
     Tries (in order):
@@ -40,6 +42,8 @@ def fetch_model_config(model_id: str, *, revision: str = "main") -> dict[str, An
     except Exception as e:  # pragma: no cover - optional path
         log.debug("try_to_load_from_cache failed for %s: %s", model_id, e)
 
+    if local_files_only:
+        return None
     # 2) Download via huggingface_hub if installed.
     try:
         from huggingface_hub import hf_hub_download

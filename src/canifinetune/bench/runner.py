@@ -20,8 +20,16 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
+from ..configuration import TrainingConfig
 from ..estimator.memory import EstimateRequest, estimate
 from ..estimator.model_metadata import fetch_metadata
+from ..training.runtime import (
+    attach_adapter,
+    effective_configuration,
+    failure_kind,
+    load_model,
+    software_stack,
+)
 from ..utils.gpu import probe_cuda
 from ..utils.logging import get_logger, utc_now_iso
 from .memory_trace import MemorySnapshot, empty_cache, reset_peak, snapshot
@@ -31,30 +39,37 @@ from .synthetic_data import make_batch
 log = get_logger("bench.runner")
 
 
-class BenchConfig(BaseModel):
-    model_id: str
+class BenchConfig(TrainingConfig):
     method: Literal["full", "lora", "qlora"] = "lora"
-    seq_len: int = Field(128, gt=0)
-    micro_batch_size: int = Field(1, gt=0)
+    seq_len: int = Field(128, ge=2)
     steps: int = Field(2, gt=0)
     lora_rank: int = Field(8, gt=0)
     lora_alpha: int = Field(16, gt=0)
-    lora_dropout: float = Field(0.0, ge=0.0, lt=1.0)
-    lora_target_scope: Literal["attention", "all_linear", "conservative"] = "attention"
-    optimizer: str = "paged_adamw_8bit"
-    quantization: str = "nf4_double_quant"
-    base_dtype: str = "bf16"
-    gradient_checkpointing: bool = True
-    attention_implementation: str = "sdpa"
+    lora_dropout: float = Field(0.0, ge=0, lt=1)
     device: str = "cuda"
-    # If set, the runner will only do `forward()` (no backward) — used for
-    # extra-tiny smoke tests.
     forward_only: bool = False
-    # If True, the runner records the static-estimate alongside the measurement.
     record_estimate: bool = True
 
 
 class BenchResult(BaseModel):
+    schema_version: int = 2
+    estimator_version: str = "0.4.0"
+    units: str = "GiB"
+    status: str = "not_run"
+    completed_steps: int = 0
+    workload: str = "synthetic full-length all-token causal labels; load + first optimizer allocation + bounded optimizer updates"
+    provenance: dict[str, Any] = Field(
+        default_factory=lambda: {
+            "source": "local",
+            "review_status": "unreviewed",
+            "cohort": "unspecified",
+        }
+    )
+    requested_configuration: dict[str, Any] = Field(default_factory=dict)
+    effective_configuration: dict[str, Any] = Field(default_factory=dict)
+    estimated_feasible: str = "unknown"
+    estimated_process_reserved_gb: float | None = None
+    prediction_budget_gb: float | None = None
     config: BenchConfig
     model_family: str
     timestamp: str
@@ -65,7 +80,7 @@ class BenchResult(BaseModel):
     avg_step_time_s: float = 0.0
     oom: dict[str, Any] = Field(default_factory=lambda: OomReport().to_dict())
     measured: dict[str, Any] = Field(default_factory=dict)
-    estimated_total_gb: float = 0.0
+    estimated_total_gb: float | None = None
     estimated_breakdown: dict[str, Any] = Field(default_factory=dict)
     notes: list[str] = Field(default_factory=list)
     success: bool = True
@@ -83,26 +98,6 @@ def _safe_clear() -> None:
         empty_cache()
 
 
-def _make_lora_config(cfg: BenchConfig, family: str) -> Any:
-    from peft import LoraConfig
-
-    from ..estimator.formulas import default_target_modules
-
-    target_modules = default_target_modules(
-        family,
-        scope=cfg.lora_target_scope,
-        strict=True,
-    )
-    return LoraConfig(
-        r=cfg.lora_rank,
-        lora_alpha=cfg.lora_alpha,
-        lora_dropout=cfg.lora_dropout,
-        bias="none",
-        target_modules=target_modules,
-        task_type="CAUSAL_LM",
-    )
-
-
 def _build_optimizer(params, name: str):
     import torch
 
@@ -113,120 +108,26 @@ def _build_optimizer(params, name: str):
 
             cls = bnb.optim.PagedAdamW8bit if name == "paged_adamw_8bit" else bnb.optim.AdamW8bit
             return cls(params, lr=2e-4)
-        except Exception as e:
+        except ImportError as e:
             raise RuntimeError(f"{name} requires a working bitsandbytes installation") from e
     if name in {"adamw_torch", "adamw_torch_fused", "adamw"}:
-        return torch.optim.AdamW(params, lr=2e-4)
+        return torch.optim.AdamW(params, lr=2e-4, fused=name == "adamw_torch_fused")
     if name == "sgd":
         return torch.optim.SGD(params, lr=1e-3)
     raise ValueError(f"Unsupported optimizer {name!r}")
 
 
-def _model_dtype_kwarg(value: Any) -> dict[str, Any]:
-    """Return ``{"dtype": value}`` for transformers ≥ 5.x, ``{"torch_dtype": value}`` for older.
-
-    transformers 5.0 renamed ``torch_dtype`` → ``dtype``. We prefer the new
-    name; if the installed transformers complains, the caller falls back.
-    """
-    return {"dtype": value}
-
-
 def _build_model(cfg: BenchConfig):
-    import torch
-    from transformers import AutoConfig, AutoModelForCausalLM
-
-    kwargs: dict[str, Any] = {"trust_remote_code": False}
-
-    # bf16 vs fp16 dtype
-    if cfg.base_dtype.lower() == "bf16":
-        dtype_value = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
-    elif cfg.base_dtype.lower() == "fp16":
-        dtype_value = torch.float16
-    elif cfg.base_dtype.lower() == "fp32":
-        dtype_value = torch.float32
-    else:
-        dtype_value = torch.float32
-    kwargs.update(_model_dtype_kwarg(dtype_value))
-
-    if cfg.method == "qlora":
-        try:
-            from transformers import BitsAndBytesConfig
-
-            compute_dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
-            kwargs["quantization_config"] = BitsAndBytesConfig(
-                load_in_4bit=True,
-                bnb_4bit_compute_dtype=compute_dtype,
-                bnb_4bit_quant_type="nf4",
-                bnb_4bit_use_double_quant=cfg.quantization == "nf4_double_quant",
-            )
-            kwargs.update(_model_dtype_kwarg(compute_dtype))
-        except Exception as e:
-            raise RuntimeError(
-                "QLoRA requires transformers.BitsAndBytesConfig and bitsandbytes"
-            ) from e
-
-    if cfg.attention_implementation in {"sdpa", "flash_attention_2", "eager"}:
-        kwargs["attn_implementation"] = cfg.attention_implementation
-
-    # For QLoRA, bitsandbytes places shards on GPU automatically when
-    # device_map is set. For LoRA / full, we load on CPU and `.to(device)` after.
-    if cfg.method == "qlora" and cfg.device.startswith("cuda"):
-        kwargs["device_map"] = {"": 0}
-
-    def _load(**extra: Any):
-        merged = {**kwargs, **extra}
-        return AutoModelForCausalLM.from_pretrained(cfg.model_id, **merged)
-
-    try:
-        model = _load()
-    except TypeError as e:
-        kwargs.pop("attn_implementation", None)
-        if "dtype" in kwargs:
-            kwargs["torch_dtype"] = kwargs.pop("dtype")
-        try:
-            model = _load()
-        except TypeError:
-            log.warning("Retrying without dtype/torch_dtype after %s", e)
-            kwargs.pop("torch_dtype", None)
-            kwargs.pop("dtype", None)
-            model = _load()
-
-    if cfg.method != "qlora" and cfg.device.startswith("cuda"):
-        model = model.to(cfg.device)
-
-    # For QLoRA we need to prepare the model for 4-bit fine-tuning.
-    if cfg.method == "qlora":
-        try:
-            from peft import prepare_model_for_kbit_training
-
-            model = prepare_model_for_kbit_training(
-                model,
-                use_gradient_checkpointing=cfg.gradient_checkpointing,
-            )
-        except Exception as e:
-            raise RuntimeError("prepare_model_for_kbit_training failed") from e
-
-    if cfg.gradient_checkpointing and not getattr(model, "is_gradient_checkpointing", False):
-        try:
-            model.gradient_checkpointing_enable()
-        except Exception as e:
-            log.warning("gradient_checkpointing_enable failed: %s", e)
-
-    config = AutoConfig.from_pretrained(cfg.model_id)
-    return model, config
+    model = load_model(cfg, cfg.device)
+    return model, model.config
 
 
 def _attach_lora(model, cfg: BenchConfig, family: str):
-    if cfg.method == "full":
-        return model
-    from peft import get_peft_model
-
-    lora_cfg = _make_lora_config(cfg, family)
-    return get_peft_model(model, lora_cfg)
+    return attach_adapter(model, cfg)
 
 
 def _torch_env() -> dict[str, Any]:
-    out: dict[str, Any] = {}
+    out: dict[str, Any] = software_stack()
     try:
         import torch
 
@@ -248,44 +149,13 @@ def _gpu_snapshot_dict() -> dict[str, Any]:
     return {"available": False, "name": "unknown"}
 
 
-def _build_estimate_total(cfg: BenchConfig, gpu_total_gb: float) -> float:
-    if gpu_total_gb <= 0.0:
-        return 0.0
-    req = EstimateRequest(
-        model_id=cfg.model_id,
-        method=cfg.method,
+def _estimate_request(cfg, gpu_total_gb, gpu_free_gb=None):
+    return EstimateRequest(
+        **cfg.training_fields(),
         gpu_vram_gb=gpu_total_gb,
-        seq_len=cfg.seq_len,
-        micro_batch_size=cfg.micro_batch_size,
-        base_dtype=cfg.base_dtype,
-        quantization=cfg.quantization if cfg.method == "qlora" else "bf16",
-        lora_rank=cfg.lora_rank,
-        lora_target_scope=cfg.lora_target_scope,
-        optimizer=cfg.optimizer,
-        gradient_checkpointing=cfg.gradient_checkpointing,
-        attention_implementation=cfg.attention_implementation,
+        available_vram_gb=gpu_free_gb,
+        use_network=not cfg.local_files_only,
     )
-    return estimate(req).memory.total_estimated_gb
-
-
-def _build_estimate_breakdown(cfg: BenchConfig, gpu_total_gb: float) -> dict[str, Any]:
-    if gpu_total_gb <= 0.0:
-        return {}
-    req = EstimateRequest(
-        model_id=cfg.model_id,
-        method=cfg.method,
-        gpu_vram_gb=gpu_total_gb,
-        seq_len=cfg.seq_len,
-        micro_batch_size=cfg.micro_batch_size,
-        base_dtype=cfg.base_dtype,
-        quantization=cfg.quantization if cfg.method == "qlora" else "bf16",
-        lora_rank=cfg.lora_rank,
-        lora_target_scope=cfg.lora_target_scope,
-        optimizer=cfg.optimizer,
-        gradient_checkpointing=cfg.gradient_checkpointing,
-        attention_implementation=cfg.attention_implementation,
-    )
-    return estimate(req).memory.model_dump()
 
 
 def run_bench(cfg: BenchConfig) -> BenchResult:
@@ -298,15 +168,21 @@ def run_bench(cfg: BenchConfig) -> BenchResult:
 
     # Pre-compute the static estimate for the same config so the result file
     # is directly usable by ``canifinetune calibrate``.
-    estimated_total = 0.0
+    estimated_total = None
     estimated_breakdown: dict[str, Any] = {}
     try:
-        md = fetch_metadata(cfg.model_id)
+        md = fetch_metadata(
+            cfg.model_id, revision=cfg.revision, use_network=not cfg.local_files_only
+        )
         family = md.family
         if cfg.record_estimate:
             gpu_total_gb = float(gpu.get("total_vram_gb") or 0.0)
-            estimated_breakdown = _build_estimate_breakdown(cfg, gpu_total_gb)
-            estimated_total = float(estimated_breakdown.get("total_estimated_gb") or 0.0)
+            if gpu_total_gb > 0:
+                est = estimate(
+                    _estimate_request(cfg, gpu_total_gb, gpu.get("free_vram_gb") or None)
+                )
+                estimated_breakdown = est.memory.model_dump()
+                estimated_total = est.memory.total_estimated_gb
     except Exception as e:
         notes.append(f"Could not resolve model metadata in advance: {e}")
         family = "unknown"
@@ -323,18 +199,38 @@ def run_bench(cfg: BenchConfig) -> BenchResult:
         estimated_breakdown=estimated_breakdown,
         notes=notes,
         method=cfg.method,
+        requested_configuration=cfg.training_fields(),
+        estimated_feasible=est.feasible
+        if cfg.record_estimate and estimated_total is not None
+        else "unknown",
+        prediction_budget_gb=(gpu.get("free_vram_gb") or gpu.get("total_vram_gb"))
+        if cfg.device.startswith("cuda")
+        else None,
+        estimated_process_reserved_gb=(estimated_total - estimated_breakdown["safety_margin_gb"])
+        if estimated_total is not None
+        else None,
     )
 
     try:
         import torch
     except Exception as e:
         result.success = False
+        result.status = "dependency_error"
         result.notes.append(f"torch not importable: {e}")
         return result
 
     if cfg.device.startswith("cuda") and not torch.cuda.is_available():
         result.success = False
+        result.status = "configuration_error"
         result.notes.append("CUDA not available; bench requires a GPU.")
+        return result
+
+    if cfg.loss_mode != "all" or cfg.use_liger_kernel:
+        result.success = False
+        result.status = "configuration_error"
+        result.notes.append(
+            "Synthetic bench supports all-token stock loss only; assistant/Liger need dataset-backed qualification"
+        )
         return result
 
     _safe_clear()
@@ -350,6 +246,8 @@ def run_bench(cfg: BenchConfig) -> BenchResult:
         result.notes.append(f"model load failed: {type(e).__name__}: {e}")
         result.notes.append(traceback.format_exc(limit=2))
         result.snapshots = [s.to_dict() for s in snapshots]
+        result.status = failure_kind(e)
+        _safe_clear()
         return result
 
     family = getattr(hf_cfg, "model_type", family) or family
@@ -362,8 +260,26 @@ def run_bench(cfg: BenchConfig) -> BenchResult:
         result.success = False
         result.notes.append(f"LoRA attach failed: {type(e).__name__}: {e}")
         result.snapshots = [s.to_dict() for s in snapshots]
+        if is_oom(e):
+            result.oom = make_oom_report("adapter_attach", e).to_dict()
+        result.status = failure_kind(e)
+        del model
+        _safe_clear()
         return result
     snapshots.append(snapshot("after_lora_attach"))
+    try:
+        result.effective_configuration = effective_configuration(model, cfg, cfg.device)
+        if cfg.use_liger_kernel:
+            raise ValueError(
+                "Liger benchmark is not qualified; use the experimental recipe path and keep its stock upper-planning proxy separate"
+            )
+    except Exception as e:
+        result.success = False
+        result.status = "configuration_error"
+        result.notes.append(str(e))
+        del model
+        _safe_clear()
+        return result
 
     optimizer = None
     if not cfg.forward_only:
@@ -374,6 +290,11 @@ def run_bench(cfg: BenchConfig) -> BenchResult:
             result.success = False
             result.notes.append(f"optimizer init failed: {type(e).__name__}: {e}")
             result.snapshots = [s.to_dict() for s in snapshots]
+            if is_oom(e):
+                result.oom = make_oom_report("optimizer_init", e).to_dict()
+            result.status = failure_kind(e)
+            del model
+            _safe_clear()
             return result
         snapshots.append(snapshot("after_optimizer_init"))
 
@@ -383,8 +304,9 @@ def run_bench(cfg: BenchConfig) -> BenchResult:
     step_times: list[float] = []
     total_tokens = 0
     last_loss: float | None = None
+    scaler = None
 
-    for step in range(cfg.steps):
+    for step in range(cfg.steps * cfg.gradient_accumulation_steps):
         try:
             batch = make_batch(
                 batch_size=cfg.micro_batch_size,
@@ -402,28 +324,46 @@ def run_bench(cfg: BenchConfig) -> BenchResult:
 
         t0 = time.perf_counter()
         try:
-            outputs = model(
-                input_ids=batch.input_ids,
-                attention_mask=batch.attention_mask,
-                labels=batch.labels,
-            )
+            dtype = {"bf16": torch.bfloat16, "fp16": torch.float16, "fp32": torch.float32}[
+                cfg.base_dtype
+            ]
+            with torch.autocast(
+                "cuda",
+                dtype=dtype,
+                enabled=cfg.device.startswith("cuda") and cfg.base_dtype != "fp32",
+            ):
+                outputs = model(
+                    input_ids=batch.input_ids,
+                    attention_mask=batch.attention_mask,
+                    labels=batch.labels,
+                )
             loss = outputs.loss
+            if not torch.isfinite(loss):
+                raise RuntimeError("non-finite loss in benchmark")
             last_loss = float(loss.detach().to("cpu").item())
             if step == 0:
                 snapshots.append(snapshot("after_first_forward"))
             if not cfg.forward_only:
-                loss.backward()
+                if scaler is None:
+                    scaler = torch.amp.GradScaler(
+                        "cuda", enabled=cfg.device.startswith("cuda") and cfg.base_dtype == "fp16"
+                    )
+                scaler.scale(loss / cfg.gradient_accumulation_steps).backward()
                 if step == 0:
                     snapshots.append(snapshot("after_first_backward"))
                 assert optimizer is not None
-                optimizer.step()
-                optimizer.zero_grad(set_to_none=True)
-                if step == 0:
-                    snapshots.append(snapshot("after_first_optimizer_step"))
+                if (step + 1) % cfg.gradient_accumulation_steps == 0:
+                    scaler.step(optimizer)
+                    scaler.update()
+                    optimizer.zero_grad(set_to_none=True)
+                    if step + 1 == cfg.gradient_accumulation_steps:
+                        snapshots.append(snapshot("after_first_optimizer_step"))
             torch.cuda.synchronize() if torch.cuda.is_available() else None
             dt = time.perf_counter() - t0
             step_times.append(dt)
             total_tokens += cfg.micro_batch_size * cfg.seq_len
+            if (step + 1) % cfg.gradient_accumulation_steps == 0:
+                result.completed_steps += 1
         except Exception as e:
             stage = "forward" if step == 0 else f"step_{step}"
             if is_oom(e):
@@ -445,11 +385,39 @@ def run_bench(cfg: BenchConfig) -> BenchResult:
     result.measured = {
         "peak_allocated_gb": round(peak_alloc, 4),
         "peak_reserved_gb": round(peak_reserved, 4),
-        "peak_total_gb": round(peak_reserved, 4),  # reserved ~= what the allocator holds
+        "peak_total_gb": round(
+            peak_reserved, 4
+        ),  # legacy alias for process reserved, never device usage
         "final_allocated_gb": round(final.allocated_gb, 4),
         "final_reserved_gb": round(final.reserved_gb, 4),
         "loss_last_step": last_loss,
     }
+
+    if result.success:
+        try:
+            result.effective_configuration = effective_configuration(model, cfg, cfg.device)
+            if optimizer is not None:
+                result.effective_configuration["optimizer_class"] = (
+                    f"{type(optimizer).__module__}.{type(optimizer).__name__}"
+                )
+                result.effective_configuration["optimizer_state_dtypes"] = sorted(
+                    {
+                        str(value.dtype).replace("torch.", "")
+                        for state in optimizer.state.values()
+                        for value in state.values()
+                        if isinstance(value, torch.Tensor)
+                    }
+                )
+        except Exception as exc:
+            result.success = False
+            result.notes.append(f"effective configuration after updates: {exc}")
+
+    if not cfg.device.startswith("cuda") or not result.success:
+        # CPU is not a zero-VRAM observation. An OOM partial trace is not an exact peak.
+        result.measured = {"loss_last_step": last_loss}
+    result.status = (
+        "success" if result.success else ("oom" if result.oom.get("happened") else "runtime_error")
+    )
 
     if step_times:
         result.avg_step_time_s = round(sum(step_times) / len(step_times), 4)
@@ -473,7 +441,9 @@ def result_path_for(
 ) -> Path:
     """Compute a deterministic file path for this benchmark result."""
     base = Path(out_dir)
-    safe_model = cfg.model_id.replace("/", "__")
+    import hashlib
+
+    safe_model = Path(cfg.model_id).name.replace("\\", "__").replace("/", "__")
     name = (
         f"{safe_model}_{cfg.method}_s{cfg.seq_len}_b{cfg.micro_batch_size}"
         f"_r{cfg.lora_rank}_steps{cfg.steps}"
@@ -490,4 +460,5 @@ def result_path_for(
         name += "_fwdonly"
     if suffix:
         name = f"{name}_{suffix}"
-    return base / f"{name}.json"
+    identity = hashlib.sha256(cfg.model_dump_json().encode()).hexdigest()[:10]
+    return base / f"{name}_{identity}_{time.time_ns()}.json"

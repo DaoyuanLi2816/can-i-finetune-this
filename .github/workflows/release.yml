@@ -1,57 +1,91 @@
 name: Release to PyPI
 
-# Publishes to PyPI when a GitHub release is published.
-# Uses PyPI trusted publishing (no token stored in the repository).
-
+# Preserve the existing workflow path and no-environment OIDC publisher binding.
+# Verify the same maintainer-qualified candidate files; never rebuild here.
 on:
   release:
     types: [published]
-
 permissions:
   contents: read
-
 jobs:
-  build:
+  verify:
     runs-on: ubuntu-latest
+    env:
+      PYTHONUTF8: "1"
+      HF_HUB_OFFLINE: "1"
+      OMP_NUM_THREADS: "2"
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-      - run: |
-          python -m pip install --upgrade pip
-          python -m pip install build
-          python -m pip install -e ".[dev]"
-      - name: Verify release tag matches package version
-        shell: bash
+      - name: Download qualified release candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          package_version="$(python -c 'import canifinetune; print(canifinetune.__version__)')"
-          tag_version="${GITHUB_REF_NAME#v}"
-          test "$package_version" = "$tag_version" || {
-            echo "release tag $GITHUB_REF_NAME does not match package version $package_version"
-            exit 1
-          }
-      - name: Verify source
+          mkdir -p dist
+          gh release download "$GITHUB_REF_NAME" --dir dist --pattern '*.whl' --pattern '*.tar.gz' --pattern 'candidate.json' --pattern 'qualification.json' --pattern 'SHA256SUMS'
+          cd dist
+          sha256sum --check SHA256SUMS
+      - name: Verify source, tag, receipts and candidate hashes
         run: |
+          pip install -e ".[dev]" build twine
           ruff check .
           ruff format --check .
           mypy src
-          pytest -q
-      - name: Build distributions
-        run: python -m build
+          pytest -q -m "not training" --cov=canifinetune --cov-fail-under=70
+          python scripts/verify_candidate.py --dist dist --tag "$GITHUB_REF_NAME" --commit "$(git rev-parse HEAD)"
+          twine check dist/*.whl dist/*.tar.gz
+      - name: Qualify installed candidate with real offline CPU training
+        run: |
+          python -m venv "$RUNNER_TEMP/train"
+          "$RUNNER_TEMP/train/bin/pip" install torch==2.6.0 --index-url https://download.pytorch.org/whl/cpu
+          wheel="$(realpath dist/*.whl)"
+          "$RUNNER_TEMP/train/bin/pip" install "canifinetune[train] @ file://$wheel" -c constraints/train-recommended.txt
+          cd "$RUNNER_TEMP"
+          "$RUNNER_TEMP/train/bin/python" "$GITHUB_WORKSPACE/scripts/qualify_candidate.py" --training
       - uses: actions/upload-artifact@v7
         with:
-          name: dist
-          path: dist/
-
+          name: verified-dist
+          path: |
+            dist/*.whl
+            dist/*.tar.gz
+            dist/SHA256SUMS
+          if-no-files-found: error
   publish:
-    needs: build
+    needs: verify
     runs-on: ubuntu-latest
     permissions:
       id-token: write
     steps:
       - uses: actions/download-artifact@v8
         with:
-          name: dist
-          path: dist/
+          name: verified-dist
+          path: candidate/
+      - run: |
+          cd candidate
+          sha256sum --check SHA256SUMS
+          mkdir ../dist
+          cp *.whl *.tar.gz ../dist/
       - uses: pypa/gh-action-pypi-publish@release/v1
+  public-install:
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - uses: actions/download-artifact@v8
+        with:
+          name: verified-dist
+          path: candidate/
+      - name: Verify official PyPI hashes and an explicit public install
+        run: |
+          python scripts/verify_public.py --version "${GITHUB_REF_NAME#v}" --candidate candidate
+          python -m venv "$RUNNER_TEMP/public"
+          "$RUNNER_TEMP/public/bin/pip" install --index-url https://pypi.org/simple "canifinetune==${GITHUB_REF_NAME#v}"
+          cd "$RUNNER_TEMP"
+          "$RUNNER_TEMP/public/bin/python" "$GITHUB_WORKSPACE/scripts/qualify_candidate.py"

@@ -20,6 +20,9 @@ class GpuInfo:
     driver_version: str = ""
     compute_capability: str = ""
     available: bool = False
+    free_memory_source: str = "unknown"
+    cuda_reported_free_gb: float | None = None
+    nvidia_smi_reported_free_gb: float | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -30,6 +33,9 @@ class GpuInfo:
             "driver_version": self.driver_version,
             "compute_capability": self.compute_capability,
             "available": self.available,
+            "free_memory_source": self.free_memory_source,
+            "cuda_reported_free_gb": self.cuda_reported_free_gb,
+            "nvidia_smi_reported_free_gb": self.nvidia_smi_reported_free_gb,
         }
 
 
@@ -76,6 +82,8 @@ def _parse_nvidia_smi(stdout: str) -> list[GpuInfo]:
                 driver_version=driver,
                 compute_capability=compute_cap,
                 available=True,
+                free_memory_source="nvidia-smi",
+                nvidia_smi_reported_free_gb=free_mb / 1024.0,
             )
         )
     return gpus
@@ -137,6 +145,8 @@ def _probe_torch_cuda() -> CudaInfo:
                     driver_version=driver_version,
                     compute_capability=f"{props.major}.{props.minor}",
                     available=True,
+                    free_memory_source="torch.cuda.mem_get_info",
+                    cuda_reported_free_gb=free / (1024**3),
                 )
             )
     return info
@@ -147,6 +157,16 @@ def probe_cuda() -> CudaInfo:
     info = _probe_torch_cuda()
     if not info.gpus:
         info.gpus = probe_gpus_via_nvidia_smi()
+    else:
+        physical = probe_gpus_via_nvidia_smi()
+        # Only reconcile an unambiguous single-device match. CUDA visibility
+        # and physical enumeration can differ on multi-GPU systems.
+        if len(info.gpus) == len(physical) == 1:
+            gpu, smi = info.gpus[0], physical[0]
+            if gpu.name == smi.name and abs(gpu.total_vram_gb - smi.total_vram_gb) < 0.05:
+                gpu.nvidia_smi_reported_free_gb = smi.free_vram_gb
+                gpu.free_vram_gb = min(gpu.free_vram_gb, smi.free_vram_gb)
+                gpu.free_memory_source = "min(torch.cuda.mem_get_info, nvidia-smi)"
     return info
 
 

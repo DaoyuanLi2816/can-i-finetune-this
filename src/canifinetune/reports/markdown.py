@@ -9,12 +9,15 @@ from typing import Any
 
 
 def _read_result(path: Path) -> dict[str, Any]:
-    return json.loads(Path(path).read_text(encoding="utf-8"))
+    data = json.loads(Path(path).read_text(encoding="utf-8"))
+    if not isinstance(data, dict):
+        raise ValueError("benchmark record must be a JSON object")
+    return data
 
 
 def _fmt_gb(v: Any) -> str:
     try:
-        return f"{float(v):.2f} GB"
+        return f"{float(v):.2f} GiB"
     except (TypeError, ValueError):
         return "—"
 
@@ -35,6 +38,7 @@ def render_report_markdown(result_paths: Iterable[Path]) -> str:
         "`estimated` is what the static estimator predicted, `measured` is "
         "what was observed on this machine.\n"
     )
+    result_paths = list(result_paths)
     for p in result_paths:
         try:
             data = _read_result(Path(p))
@@ -42,6 +46,22 @@ def render_report_markdown(result_paths: Iterable[Path]) -> str:
             sections.append(f"## {p}\n\n_Could not parse result: {e}_\n")
             continue
         sections.append(_render_one_result(Path(p), data))
+    from ..evidence import error_summary
+
+    records = []
+    for path in result_paths:
+        try:
+            records.append(_read_result(Path(path)))
+        except (ValueError, OSError):
+            continue
+    sections.append(
+        "## Independent validation summary\n\n```json\n"
+        + json.dumps(error_summary(records), indent=2)
+        + "\n```\n"
+    )
+    sections.append(
+        "Units are GiB (legacy field suffix _gb). Allocated/reserved are process-level torch allocator metrics, not total device use. Estimates include a separate safety margin. Historical fit data and unreviewed community records are excluded from the independent summary."
+    )
     return "\n".join(sections).rstrip() + "\n"
 
 
@@ -49,7 +69,11 @@ def _render_one_result(path: Path, data: dict[str, Any]) -> str:
     cfg = data.get("config", {})
     gpu = data.get("gpu", {})
     env = data.get("env", {})
-    measured = data.get("measured", {})
+    measured = (
+        data.get("measured", {})
+        if data.get("success", True) and not data.get("oom", {}).get("happened")
+        else {}
+    )
     oom = data.get("oom", {})
     success = data.get("success", True)
     status = "OK" if success and not oom.get("happened") else "FAILED"
@@ -125,8 +149,8 @@ def render_compare_markdown(result_paths: Iterable[Path]) -> str:
         "quant",
         "ckpt",
         "opt",
-        "peak GB (meas)",
-        "estimated GB",
+        "peak GiB (meas)",
+        "estimated GiB",
         "tok/s",
         "OOM?",
     ]
@@ -136,7 +160,11 @@ def render_compare_markdown(result_paths: Iterable[Path]) -> str:
         except Exception:
             continue
         cfg = data.get("config", {})
-        measured = data.get("measured", {})
+        measured = (
+            data.get("measured", {})
+            if data.get("success", True) and not data.get("oom", {}).get("happened")
+            else {}
+        )
         oom = data.get("oom", {})
         rows.append(
             [

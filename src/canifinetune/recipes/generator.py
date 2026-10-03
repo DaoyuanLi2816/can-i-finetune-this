@@ -1,6 +1,6 @@
 """Render a complete recipe folder for a given (model, method, ...) request.
 
-Each recipe is self-contained: ``train.py``, ``config.yaml``, ``run.sh``,
+Each recipe is package-backed: ``train.py``, ``config.yaml``, ``run.sh``,
 ``eval_smoke.py``, ``requirements.txt``, ``README.md``, and a few short
 docs. The training script is small, opinionated, and works on a single
 consumer GPU using Hugging Face Transformers + PEFT + (optionally)
@@ -11,36 +11,23 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
 
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
-from pydantic import BaseModel, Field
+from pydantic import Field
 
-from ..estimator.formulas import default_target_modules
+from .. import __version__
+from ..configuration import TrainingConfig, resolve_targets
 from ..estimator.memory import EstimateRequest, estimate
 from ..estimator.model_metadata import fetch_metadata
 
 _TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 
 
-class RecipeRequest(BaseModel):
-    model_id: str
-    method: Literal["full", "lora", "qlora"] = "qlora"
-    seq_len: int = Field(2048, gt=0)
-    micro_batch_size: int = Field(1, gt=0)
+class RecipeRequest(TrainingConfig):
     gradient_accumulation_steps: int = Field(8, gt=0)
-    lora_rank: int = Field(16, gt=0)
-    lora_alpha: int = Field(32, gt=0)
-    lora_dropout: float = Field(0.05, ge=0.0, lt=1.0)
-    lora_target_scope: Literal["attention", "all_linear", "conservative"] = "attention"
-    base_dtype: str = "bf16"
-    quantization: str = "nf4_double_quant"
-    optimizer: str = "paged_adamw_8bit"
-    gradient_checkpointing: bool = True
-    attention_implementation: str = "sdpa"
-    use_liger_kernel: bool = False
-    learning_rate: float = 2e-4
-    max_steps: int = 50
+    learning_rate: float = Field(2e-4, gt=0)
+    max_steps: int = Field(50, gt=0)
+    device: str = "cuda"
     output_dir: Path = Field(..., description="Where to write the recipe folder.")
     gpu_vram_gb: float = Field(16.0, gt=0.0)
     project_name: str = "canifinetune-recipe"
@@ -67,31 +54,30 @@ def _render(env: Environment, template: str, ctx: dict) -> str:
 
 
 def _build_context(req: RecipeRequest) -> dict:
-    md = fetch_metadata(req.model_id)
-    target_modules = default_target_modules(
-        md.family,
-        scope=req.lora_target_scope,
-        strict=True,
-    )
+    if Path(req.model_id).is_dir():
+        req = req.model_copy(update={"model_id": str(Path(req.model_id).resolve())})
+    md = fetch_metadata(req.model_id, revision=req.revision, use_network=not req.local_files_only)
+    target_modules = resolve_targets(req, md.family)
 
     # Pre-compute the static estimate so the recipe's README shows it.
     er = EstimateRequest(
-        model_id=req.model_id,
-        method=req.method,
+        **req.training_fields(),
         gpu_vram_gb=req.gpu_vram_gb,
-        seq_len=req.seq_len,
-        micro_batch_size=req.micro_batch_size,
-        lora_rank=req.lora_rank,
-        lora_target_scope=req.lora_target_scope,
-        optimizer=req.optimizer,
-        base_dtype=req.base_dtype,
-        quantization=req.quantization if req.method == "qlora" else "bf16",
-        gradient_checkpointing=req.gradient_checkpointing,
-        attention_implementation=req.attention_implementation,
+        use_network=not req.local_files_only,
     )
     est = estimate(er)
 
     return {
+        "package_version": __version__,
+        "runtime_config": {
+            **req.training_fields(),
+            "target_modules": target_modules or None,
+            "learning_rate": req.learning_rate,
+            "max_steps": req.max_steps,
+            "device": req.device,
+            "output_dir": "output",
+            "dataset_path": "data/sample.jsonl",
+        },
         "req": req.model_dump(),
         "model_id": req.model_id,
         "method": req.method,
@@ -123,7 +109,7 @@ def _build_context(req: RecipeRequest) -> dict:
         "uses_4bit": req.method == "qlora",
         "extra_deps": [
             *(
-                ["bitsandbytes>=0.43"]
+                ["bitsandbytes>=0.49.2,<0.50"]
                 if req.method == "qlora"
                 or "8bit" in req.optimizer
                 or req.optimizer.startswith("paged")

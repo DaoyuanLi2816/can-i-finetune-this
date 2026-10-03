@@ -29,6 +29,7 @@ class MemorySnapshot:
             "max_reserved_gb": round(self.max_reserved_gb, 4),
             "free_gb": round(self.free_gb, 4),
             "total_gb": round(self.total_gb, 4),
+            "free_memory_source": "torch.cuda.mem_get_info",
         }
 
 
