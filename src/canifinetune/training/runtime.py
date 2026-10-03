@@ -106,15 +106,16 @@ def validate_device(config, device):
             )
         if config.use_liger_kernel or config.attention_implementation == "flash_attention_2":
             raise ValueError("Liger/Flash Attention require a qualified CUDA environment")
-    elif device != "cuda" and not device.startswith("cuda:"):
-        raise ValueError("device must be cpu, cuda, or cuda:N")
+    elif device != "cuda":
+        raise ValueError(
+            "device must be cpu or cuda; secondary CUDA device selection is not qualified"
+        )
     else:
         if not torch.cuda.is_available():
             raise ValueError(
                 "CUDA unavailable; select device=cpu and fp32 for a tiny full/LoRA run"
             )
-        index = int(device.split(":")[1]) if ":" in device else 0
-        torch.cuda.set_device(index)
+        torch.cuda.set_device(0)
         if config.base_dtype == "bf16" and not torch.cuda.is_bf16_supported():
             raise ValueError(
                 "requested bf16 is unsupported; explicitly choose fp16 and re-estimate"
@@ -212,6 +213,9 @@ def effective_configuration(model, config, device):
     import torch
 
     effective = config.training_fields()
+    expected_device = torch.device("cpu" if device == "cpu" else "cuda:0")
+    if any(p.device != expected_device for p in model.parameters()):
+        raise ValueError("model parameters differ from the requested execution device")
     effective["target_modules"] = resolve_targets(config, model.config.model_type)
     effective["device"] = device
     effective["resolved_revision"] = getattr(model.config, "_commit_hash", None)

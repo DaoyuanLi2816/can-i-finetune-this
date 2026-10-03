@@ -84,3 +84,15 @@ def test_liger_has_explicit_unvalidated_memory_proxy():
     assert result.confidence == "low"
     assert result.planned_configuration["loss_backend"] == "liger"
     assert any("proxy" in warning for warning in result.warnings)
+
+
+def test_secondary_cuda_device_is_rejected_before_loading(monkeypatch):
+    import sys
+    from types import SimpleNamespace
+
+    from canifinetune.configuration import TrainingConfig
+    from canifinetune.training.runtime import validate_device
+
+    monkeypatch.setitem(sys.modules, "torch", SimpleNamespace())
+    with pytest.raises(ValueError, match="secondary CUDA device"):
+        validate_device(TrainingConfig(model_id="org/model"), "cuda:1")

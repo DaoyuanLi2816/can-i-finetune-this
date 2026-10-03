@@ -37,7 +37,9 @@ weights and PEFT-prepared unquantized parameters can be fp32 with bf16 compute.
 
 CPU supports explicit fp32 full/LoRA with native AdamW or SGD. CUDA BF16 requires
 hardware support; there is no dtype/attention retry. Full fp16 weight training is
-rejected. Single-device training only; remote code is disabled and gated access
+rejected. Single default-device training only (`cpu` or `cuda`); explicit secondary CUDA
+device selection is rejected until it is qualified. Actual parameter devices are
+checked before and after updates; remote code is disabled and gated access
 must already be granted. Flash Attention and Linux/Triton Liger are experimental,
 not release-qualified. Liger uses a separate low-confidence stock planning proxy,
 never stock calibration or a stock-loss accuracy claim.
