@@ -13,6 +13,7 @@ import sys
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
+from . import __version__
 from .utils.gpu import CudaInfo, GpuInfo, host_info, probe_cuda
 from .utils.subprocess import try_run
 
@@ -30,6 +31,9 @@ _OPTIONAL_LIBS = [
     "rich",
     "flash_attn",
 ]
+_QUICKSTART = (
+    f"https://github.com/DaoyuanLi2816/can-i-finetune-this/blob/v{__version__}/docs/quickstart.md"
+)
 
 
 @dataclass
@@ -140,19 +144,21 @@ def run_doctor() -> DoctorReport:
     # Sanity-check derived issues.
     if not cuda.torch_available:
         report.issues.append(
-            "torch is not installed. Install with `pip install canifinetune[train]` "
-            "or `uv pip install -e .[train]` to run benchmarks."
+            "torch is not installed; core estimation remains available. "
+            "Install the CPU or CUDA torch 2.6.0 wheel and canifinetune[train] "
+            f"using the qualified constraints to run training/benchmarks. See {_QUICKSTART}"
         )
     elif not cuda.torch_cuda_available:
         report.issues.append(
             "torch is installed but cannot see CUDA. Install the matching CUDA wheel, e.g. "
-            "`pip install --index-url https://download.pytorch.org/whl/cu124 torch`."
+            "`pip install --index-url https://download.pytorch.org/whl/cu124 torch==2.6.0` "
+            "with a compatible NVIDIA driver. CPU full/LoRA remains available with explicit fp32."
         )
     if cuda.gpus:
         gpu0: GpuInfo = cuda.gpus[0]
         if gpu0.total_vram_gb and gpu0.total_vram_gb < 4.0:
             report.issues.append(
-                f"GPU has only {gpu0.total_vram_gb:.1f} GB VRAM; only tiny models can be fine-tuned."
+                f"GPU has only {gpu0.total_vram_gb:.1f} GiB VRAM; only tiny models can be fine-tuned."
             )
     else:
         report.issues.append("No NVIDIA GPU detected.")
@@ -161,7 +167,8 @@ def run_doctor() -> DoctorReport:
     if bnb and not bnb.installed:
         report.issues.append(
             "bitsandbytes is not installed. QLoRA (4-bit) requires it. "
-            "On Windows, prefer `pip install bitsandbytes>=0.43.1` (recent versions ship Windows wheels)."
+            "Install canifinetune[train] with the qualified constraints (bitsandbytes 0.49.2); "
+            f"CUDA is required for the qualified QLoRA path. See {_QUICKSTART}"
         )
 
     if not report.tiny_model_load.get("ok"):
