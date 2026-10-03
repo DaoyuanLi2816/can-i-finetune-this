@@ -82,7 +82,7 @@ def qualify(training=False, cuda=False, receipt=None):
                         method=method,
                         device=device,
                         base_dtype="fp32" if device == "cpu" else "bf16",
-                        optimizer="adamw_torch",
+                        optimizer="paged_adamw_8bit" if method == "qlora" else "adamw_torch",
                         seq_len=128,
                         max_steps=2,
                         gradient_accumulation_steps=1,
@@ -103,10 +103,34 @@ def qualify(training=False, cuda=False, receipt=None):
                 run = json.loads((recipe / "output/run.json").read_text(encoding="utf-8"))
                 assert run["status"] == "success" and run["completed_updates"] == 2
                 assert run["effective_configuration"]["method"] == method
+                import torch
+
+                artifact = recipe / "output" / run["saved_artifact"]
+                if method == "full":
+                    from transformers import AutoModelForCausalLM
+
+                    original = AutoModelForCausalLM.from_pretrained(model, local_files_only=True)
+                    updated = AutoModelForCausalLM.from_pretrained(artifact, local_files_only=True)
+                    changed = sum(
+                        not torch.equal(a, b)
+                        for a, b in zip(original.parameters(), updated.parameters(), strict=True)
+                    )
+                    del original, updated
+                else:
+                    from safetensors.torch import load_file
+
+                    weights = load_file(str(artifact / "adapter_model.safetensors"))
+                    changed = sum(
+                        int(torch.count_nonzero(value)) > 0
+                        for name, value in weights.items()
+                        if "lora_B" in name
+                    )
+                assert changed > 0, "optimizer steps did not change saved parameters"
                 runs.append(
                     {
                         "status": run["status"],
                         "completed_updates": run["completed_updates"],
+                        "changed_parameter_tensors": changed,
                         "effective_configuration": {
                             key: value
                             for key, value in run["effective_configuration"].items()
