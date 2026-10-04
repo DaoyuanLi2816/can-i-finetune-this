@@ -77,5 +77,6 @@ nav:
       - 安装与第一次运行: zh-CN/quickstart.md
   - Maintainer:
       - Release process: releasing.md
+      - 0.4.1 release verification: release-verification-0.4.1.md
       - 0.4.0 release verification: release-verification-0.4.0.md
       - Implementation record: delivery-0.4.0.md
