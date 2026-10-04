@@ -17,6 +17,8 @@ has ADMIN permission. Work uses a branch and CI before integration.
 | Calibration evidence | Historical regression data informed the estimator; it is not independent validation. |
 | Configuration divergence | Confirmed: QLoRA bench overrides compute dtype; fused optimizer name does not actually enable fused AdamW. |
 | Trusted publishing | Already present and working; retain release.yml and its current no-environment OIDC binding. |
+| Pre-quantized input | Transformers 5.8.1's actual config merge retains checkpoint 4-bit settings despite an int8 request. Reject declared pre-quantized bases before weights and in metadata. |
+| PyPI documentation links | The published 0.3.0 relative changelog URL resolves within PyPI and returns 404. Main README now uses versioned absolute repository links. |
 
 ## Design decisions
 
@@ -53,9 +55,9 @@ Calibration schema 3 separates compatible fits from prospective/community eviden
 The original 70% core coverage gate is retained; optional torch runtime has actual
 CPU integration and candidate CUDA qualification rather than fabricated core coverage.
 
-No-torch Python 3.12 core: 101 tests passed,
+No-torch Python 3.12 core: 102 tests passed (71.44% coverage),
 ruff/format/mypy/generated Python checks passed. Minimum and recommended CPU
-stacks each passed 13 real integration tests. Four bounded prospective GPU
+stacks each passed 14 real integration tests. Four bounded prospective GPU
 observations succeeded; predictions are unchanged from 0.3.0 and conservatively
 high (MAPE 46.2%). No claim of accuracy improvement or cross-hardware validation.
 See validation-0.4.0.md and its raw files. A resource-pressure repeat was interrupted
@@ -65,6 +67,12 @@ The actual 0.3.0 tiny recipe completed one update after a GBK UnicodeDecodeError
 prevented TRL import and selected its legacy fallback. This is version/environment
 specific; it does not establish that modern TRL always fails. The statically
 confirmed divergent processing paths were removed regardless of that import result.
+
+The pre-quantization config merge probe loaded no weights and allocated no GPU
+model. It is evidence of configuration precedence, not int8/4-bit accuracy or
+physical memory qualification. A local config-only checkpoint regression proves
+the new guard runs before weight lookup. Doctor installation guidance now matches
+the qualified torch/bitsandbytes constraints.
 
 ## Delivery status
 

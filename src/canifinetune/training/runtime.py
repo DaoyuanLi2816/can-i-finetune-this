@@ -16,7 +16,7 @@ import yaml
 from pydantic import Field
 
 from .. import __version__
-from ..configuration import TrainingConfig, resolve_targets
+from ..configuration import TrainingConfig, resolve_targets, validate_base_checkpoint
 from ..utils.logging import utc_now_iso
 from .data import load_records
 
@@ -126,14 +126,22 @@ def load_model(config: TrainingConfig, device="cuda"):
     import torch
     import transformers
     from packaging.version import Version
-    from transformers import AutoModelForCausalLM, BitsAndBytesConfig
+    from transformers import AutoConfig, AutoModelForCausalLM, BitsAndBytesConfig
 
     validate_device(config, device)
     if config.base_dtype == "fp16" and config.method == "full":
         raise ValueError(
             "full fp16 weight training is unsupported by this runtime; choose bf16 or fp32"
         )
+    base_config = AutoConfig.from_pretrained(
+        config.model_id,
+        revision=config.revision,
+        trust_remote_code=False,
+        local_files_only=config.local_files_only,
+    )
+    validate_base_checkpoint(getattr(base_config, "quantization_config", None))
     kwargs = {
+        "config": base_config,
         "trust_remote_code": False,
         "revision": config.revision,
         "local_files_only": config.local_files_only,

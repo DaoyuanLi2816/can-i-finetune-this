@@ -99,6 +99,8 @@ dtype are never removed in a broad exception retry. CPU requires explicit fp32.
 Unsupported BF16 requires a user-selected alternative and a new estimate.
 Full FP16 weight training is rejected. Custom LoRA target lists outside supported
 scopes lack a reliable static model and are rejected by estimation/recipe.
+Pre-quantized checkpoints are rejected; choose an unquantized base and request
+quantization explicitly to keep prediction and actual loading aligned.
 
 Liger recipes remain **experimental** (`--liger`, optional Linux/Triton dependency).
 Their stock logits allocation is retained as an explicit conservative planning

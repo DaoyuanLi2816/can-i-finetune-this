@@ -72,3 +72,12 @@ def test_offline_config_cache_never_downloads(monkeypatch, tmp_path):
     config.write_text('{"model_type":"qwen2"}', encoding="utf-8")
     monkeypatch.setattr(huggingface_hub, "try_to_load_from_cache", lambda **kwargs: str(config))
     assert fetch_model_config("org/cached", local_files_only=True) == {"model_type": "qwen2"}
+
+
+def test_prequantized_local_checkpoint_rejected_without_weights(tmp_path):
+    import json
+
+    config = {**MIXTRAL_CONFIG, "quantization_config": {"load_in_4bit": True}}
+    (tmp_path / "config.json").write_text(json.dumps(config), encoding="utf-8")
+    with pytest.raises(ValueError, match="pre-quantized"):
+        metadata.fetch_metadata(str(tmp_path), use_network=False)

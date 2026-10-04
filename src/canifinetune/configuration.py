@@ -71,3 +71,11 @@ def resolve_targets(config: TrainingConfig, family: str) -> list[str]:
     return config.target_modules or default_target_modules(
         family, scope=config.lora_target_scope, strict=True
     )
+
+
+def validate_base_checkpoint(quantization_config: object) -> None:
+    if quantization_config is not None:
+        raise ValueError(
+            "pre-quantized checkpoints are not qualified; select an unquantized base checkpoint "
+            "and request quantization explicitly so estimation and loading agree"
+        )
