@@ -16,6 +16,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
+from ..configuration import validate_base_checkpoint
 from ..utils.hf import fetch_model_config, fetch_model_parameter_count
 from ..utils.logging import get_logger
 from .formulas import ArchHints
@@ -181,6 +182,7 @@ def register_known_model(model_id: str, spec: dict[str, Any]) -> None:
 
 
 def _from_spec(model_id: str, spec: dict[str, Any], *, source: str) -> ModelMetadata:
+    validate_base_checkpoint(spec.get("quantization_config"))
     family = str(spec.get("family", _guess_family(model_id)))
     arch = ArchHints(
         hidden_size=int(spec["hidden_size"]),
@@ -212,6 +214,7 @@ def _from_hf_config(
     exact_total_params: int | None = None,
 ) -> ModelMetadata | None:
     """Pull arch hints from a HF ``config.json`` payload."""
+    validate_base_checkpoint(cfg.get("quantization_config"))
 
     def first_int(*values: Any) -> int:
         value = next((candidate for candidate in values if candidate is not None), None)
@@ -371,6 +374,7 @@ def fetch_metadata(
 
     cfg = fetch_model_config(model_id, revision=revision, local_files_only=not use_network)
     if cfg is not None:
+        validate_base_checkpoint(cfg.get("quantization_config"))
         exact_total = (
             fetch_model_parameter_count(model_id, revision=revision) if use_network else None
         )

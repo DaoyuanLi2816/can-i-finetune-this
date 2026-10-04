@@ -189,3 +189,22 @@ def test_dataset_reports_line_and_statistics(tmp_path, tiny):
     path.write_text('\n{"instruction":"Hi", "output":""}\n')
     with pytest.raises(ValueError, match="line 2"):
         load_records(path, tiny[1], 128)
+
+
+def test_prequantized_checkpoint_rejected_before_weight_loading(tmp_path, tiny):
+    from canifinetune.training.runtime import load_model
+
+    base = json.loads((tiny[0] / "config.json").read_text(encoding="utf-8"))
+    base["quantization_config"] = {"quant_method": "bitsandbytes", "load_in_4bit": True}
+    (tmp_path / "config.json").write_text(json.dumps(base), encoding="utf-8")
+    config = RunConfig(
+        model_id=str(tmp_path),
+        method="full",
+        base_dtype="fp32",
+        optimizer="adamw_torch",
+        device="cpu",
+        local_files_only=True,
+    )
+    # The directory has no weights: the native configuration must be rejected first.
+    with pytest.raises(ValueError, match="pre-quantized"):
+        load_model(config, "cpu")

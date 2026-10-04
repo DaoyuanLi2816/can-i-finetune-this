@@ -35,6 +35,12 @@ before and after updates. Qualified bitsandbytes 0.49's first-input precision
 heuristic is disabled to preserve an explicit 4-bit compute request. Adapter
 weights and PEFT-prepared unquantized parameters can be fp32 with bf16 compute.
 
+Select an unquantized base checkpoint and request quantization explicitly.
+Checkpoints that already declare `quantization_config` are rejected before weight
+loading: Transformers can prefer the checkpoint's own configuration over the
+requested one. Metadata estimation rejects declared pre-quantized inputs too;
+catalogue entries describe their unquantized base architecture, not every revision.
+
 CPU supports explicit fp32 full/LoRA with native AdamW or SGD. CUDA BF16 requires
 hardware support; there is no dtype/attention retry. Full fp16 weight training is
 rejected. Single default-device training only (`cpu` or `cuda`); explicit secondary CUDA
