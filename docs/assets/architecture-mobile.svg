@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 920" role="img" aria-labelledby="title description">
+  <title id="title">canifinetune workflow</title>
+  <desc id="description">Model metadata, GPU memory and shared configuration feed torch-free planning. Installed training and benchmarks load weights, update, save and reload. Records retain actual configuration and evidence scope.</desc>
+  <defs><marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10" fill="#64748b"/></marker></defs>
+  <rect width="520" height="920" rx="20" fill="#0f172a"/>
+  <g font-family="Segoe UI, Helvetica, Arial, sans-serif">
+    <text x="28" y="48" fill="#f8fafc" font-size="25" font-weight="750">From plan to execution</text>
+    <text x="28" y="78" fill="#94a3b8" font-size="17">One configuration, visible evidence.</text>
+    <rect x="28" y="108" width="464" height="120" rx="14" fill="#fff"/>
+    <text x="48" y="142" fill="#0f172a" font-size="21" font-weight="700">Model + GPU + training request</text>
+    <text x="48" y="174" fill="#475569" font-size="17">Metadata and pinned revision</text>
+    <text x="48" y="202" fill="#475569" font-size="17">Actual total / free memory in GiB</text>
+    <path d="M260 228V260" stroke="#64748b" stroke-width="2.5" marker-end="url(#arrow)"/>
+    <rect x="28" y="270" width="464" height="120" rx="14" fill="#0f766e"/>
+    <text x="48" y="306" fill="#fff" font-size="21" font-weight="700">Shared validated configuration</text>
+    <text x="48" y="338" fill="#ccfbf1" font-size="17">Dtype · attention · targets · optimizer</text>
+    <text x="48" y="366" fill="#ccfbf1" font-size="17">Quantization · checkpointing · loss</text>
+    <path d="M260 390V422" stroke="#64748b" stroke-width="2.5" marker-end="url(#arrow)"/>
+    <rect x="28" y="432" width="464" height="128" rx="14" fill="#fff"/>
+    <text x="48" y="464" fill="#0369a1" font-size="15" font-weight="750">PLAN · NO TORCH / NO WEIGHTS</text>
+    <text x="48" y="498" fill="#0f172a" font-size="22" font-weight="700">Estimate → recommend → recipe</text>
+    <text x="48" y="534" fill="#475569" font-size="17">Budget, assumptions and matching settings</text>
+    <path d="M260 560V592" stroke="#64748b" stroke-width="2.5" marker-end="url(#arrow)"/>
+    <rect x="28" y="602" width="464" height="128" rx="14" fill="#fff"/>
+    <text x="48" y="634" fill="#047857" font-size="15" font-weight="750">EXECUTE · LOADS WEIGHTS</text>
+    <text x="48" y="668" fill="#0f172a" font-size="22" font-weight="700">Recipe / benchmark</text>
+    <text x="48" y="704" fill="#475569" font-size="17">Update, save, reload · allocated/reserved</text>
+    <path d="M260 730V762" stroke="#64748b" stroke-width="2.5" marker-end="url(#arrow)"/>
+    <rect x="28" y="772" width="464" height="104" rx="14" fill="#172c3b" stroke="#334d60"/>
+    <text x="48" y="808" fill="#e2e8f0" font-size="21" font-weight="700">Reviewable records and reports</text>
+    <text x="48" y="840" fill="#a5c3d0" font-size="16">Fits, validation and community stay separate.</text>
+  </g>
+</svg>

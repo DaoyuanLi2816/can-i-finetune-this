@@ -1,0 +1,81 @@
+site_name: canifinetune
+site_description: Plan LLM fine-tuning on one GPU with memory estimates, local benchmarks and runnable LoRA/QLoRA recipes.
+site_url: https://daoyuanli2816.github.io/can-i-finetune-this/
+repo_url: https://github.com/DaoyuanLi2816/can-i-finetune-this
+repo_name: DaoyuanLi2816/can-i-finetune-this
+edit_uri: edit/main/docs/
+copyright: Copyright &copy; Daoyuan Li
+theme:
+  name: material
+  language: en
+  font: false
+  logo: assets/logo.png
+  favicon: assets/logo.png
+  icon:
+    repo: fontawesome/brands/github
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: teal
+      accent: teal
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: teal
+      accent: teal
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  features:
+    - navigation.sections
+    - navigation.indexes
+    - navigation.top
+    - navigation.footer
+    - content.code.copy
+    - search.highlight
+    - search.suggest
+plugins:
+  - search:
+      # Chinese is segmented by jieba at build time. Keep those tokens intact
+      # instead of loading the Node-only Chinese tokenizer in the browser.
+      lang: en
+      separator: '[\s\u200b\-,:!=\[\]()"/，。！？；：、]+'
+      pipeline: []
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.superfences
+extra_css:
+  - assets/extra.css
+exclude_docs: |
+  architecture.html
+nav:
+  - Home: index.md
+  - Get started:
+      - PyPI quickstart: quickstart.md
+      - Choose a workflow: workflows.md
+      - Compatibility and migration: compatibility.md
+      - Troubleshooting: troubleshooting.md
+  - Understand the system:
+      - Architecture: how-it-works.md
+      - Training and data contract: training.md
+      - Memory model: memory_model.md
+      - Design: design.md
+  - Measurements:
+      - Read and contribute evidence: evidence.md
+      - Prospective validation: validation-0.4.0.md
+      - Historical baselines: rtx4080_baselines.md
+  - 中文入门:
+      - 项目介绍: zh-CN/index.md
+      - 安装与第一次运行: zh-CN/quickstart.md
+  - Maintainer:
+      - Release process: releasing.md
+      - 0.4.0 release verification: release-verification-0.4.0.md
+      - Implementation record: delivery-0.4.0.md

@@ -23,7 +23,7 @@ validation and state denominator rules. See [memory model](memory_model.md).
 The stdlib HTTP demo binds loopback, serves packaged assets and only estimates
 catalogue models. No arbitrary URLs, execution, login, telemetry or uploads.
 Community sharing is an explicit allowlist export followed by manual submission
-and maintainer verification. See [contributing](../CONTRIBUTING.md).
+and maintainer verification. See [contributing](https://github.com/DaoyuanLi2816/can-i-finetune-this/blob/main/CONTRIBUTING.md).
 
 Extension work should add a model/target mapping with behavioral and bounded
 training checks, or improve measured scope and configuration matching. A new

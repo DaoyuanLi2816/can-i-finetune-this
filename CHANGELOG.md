@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.1
+
+- Restore the README banner, architecture visual and first-use story with a new
+  project logo, English/Chinese entry points and the local demo screenshot.
+- Publish searchable Material documentation with workflow, architecture,
+  compatibility and evidence guides, plus a Chinese quickstart.
+- Keep the 0.4.0 estimator model and original experiment records unchanged;
+  this patch improves presentation and documentation, with installed-package
+  qualification repeated for the new distribution files.
+
 ## 0.4.0
 
 - Replace divergent TRL/Trainer paths with one package-backed runtime and strict

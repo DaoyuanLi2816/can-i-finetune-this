@@ -122,7 +122,7 @@ False-feasible is 0/4 for the recorded short workload/budget. False-infeasible
 is undefined because there is no predicted-no sample. These are descriptive
 counts, not calibrated OOM probabilities. No new cohort observations were fitted.
 
-See [raw records and paired analysis](../benchmarks/validation-0.4.0) and
+See [raw records and paired analysis](https://github.com/DaoyuanLi2816/can-i-finetune-this/tree/v0.4.0/benchmarks/validation-0.4.0) and
 [full validation report](validation-0.4.0.md). Historical raw measurements are
 preserved. A resource-pressure repeat was interrupted and excluded; it is neither
 a successful observation nor an OOM with a fabricated peak. Tiny/random and short

@@ -33,7 +33,7 @@
 
   <!-- context pill -->
   <rect x="40" y="178" width="200" height="28" rx="14" fill="#34d399" fill-opacity="0.10" stroke="#34d399" stroke-opacity="0.55"/>
-  <text x="54" y="196" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12.5" fill="#a7f3d0">LoRA &#183; QLoRA &#183; 12&#8211;24 GB GPUs</text>
+  <text x="54" y="196" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12.5" fill="#a7f3d0">LoRA &#183; QLoRA &#183; single GPU</text>
 
   <!-- pip install pill -->
   <rect x="40" y="214" width="216" height="26" rx="13" fill="#ffffff" fill-opacity="0.07" stroke="#ffffff" stroke-opacity="0.18"/>
@@ -51,9 +51,9 @@
     <g font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
       <text x="366" y="102" font-size="14" font-weight="700" fill="#f1f5f9">Estimate</text>
       <text x="366" y="120" font-size="14" font-weight="700" fill="#f1f5f9">up front</text>
-      <text x="366" y="142" font-size="11.5" fill="#94a3b8">fits or OOMs, plus a</text>
+      <text x="366" y="142" font-size="11.5" fill="#94a3b8">memory breakdown + a</text>
       <text x="366" y="158" font-size="11.5" fill="#94a3b8">batch &#183; seq &#183; rank plan</text>
-      <text x="366" y="180" font-size="10.5" fill="#fcd34d" fill-opacity="0.9">no 14 GB download</text>
+      <text x="366" y="180" font-size="10.5" fill="#fcd34d" fill-opacity="0.9">no weight download</text>
       <text x="366" y="195" font-size="10.5" fill="#fcd34d" fill-opacity="0.9">to find out</text>
     </g>
   </g>
@@ -72,8 +72,8 @@
       <text x="536" y="120" font-size="14" font-weight="700" fill="#f1f5f9">benchmarks</text>
       <text x="536" y="142" font-size="11.5" fill="#94a3b8">measure real steps</text>
       <text x="536" y="158" font-size="11.5" fill="#94a3b8">on your own card</text>
-      <text x="536" y="180" font-size="10.5" fill="#fcd34d" fill-opacity="0.9">calibrates the</text>
-      <text x="536" y="195" font-size="10.5" fill="#fcd34d" fill-opacity="0.9">estimator with data</text>
+      <text x="536" y="180" font-size="10.5" fill="#fcd34d" fill-opacity="0.9">compare the plan</text>
+      <text x="536" y="195" font-size="10.5" fill="#fcd34d" fill-opacity="0.9">with observations</text>
     </g>
   </g>
 
@@ -91,8 +91,8 @@
       <text x="706" y="120" font-size="14" font-weight="700" fill="#f1f5f9">recipes</text>
       <text x="706" y="142" font-size="11.5" fill="#94a3b8">HF + PEFT</text>
       <text x="706" y="158" font-size="11.5" fill="#94a3b8">training scripts</text>
-      <text x="706" y="180" font-size="10.5" fill="#fcd34d" fill-opacity="0.9">one command from</text>
-      <text x="706" y="195" font-size="10.5" fill="#fcd34d" fill-opacity="0.9">plan to training</text>
+      <text x="706" y="180" font-size="10.5" fill="#fcd34d" fill-opacity="0.9">update, save</text>
+      <text x="706" y="195" font-size="10.5" fill="#fcd34d" fill-opacity="0.9">and reload</text>
     </g>
   </g>
 </svg>

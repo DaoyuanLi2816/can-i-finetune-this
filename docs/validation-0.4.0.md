@@ -84,4 +84,4 @@ No WSL GPU, other GPU, Flash Attention, Liger, int8/fp4 accuracy, long-training
 stability or useful fine-tuned quality is qualified. Historical development raw
 files remain unchanged and separate. Community measurements need review.
 
-[Raw records and old/new summaries](../benchmarks/validation-0.4.0).
+[Raw records and old/new summaries](https://github.com/DaoyuanLi2816/can-i-finetune-this/tree/v0.4.0/benchmarks/validation-0.4.0).
