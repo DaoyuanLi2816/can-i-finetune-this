@@ -13,7 +13,7 @@
 </p>
 
 [![CI](https://github.com/DaoyuanLi2816/can-i-finetune-this/actions/workflows/ci.yml/badge.svg)](https://github.com/DaoyuanLi2816/can-i-finetune-this/actions/workflows/ci.yml)
-[![PyPI](https://img.shields.io/pypi/v/canifinetune.svg)](https://pypi.org/project/canifinetune/)
+[![PyPI 0.4.1](https://img.shields.io/badge/PyPI-v0.4.1-blue)](https://pypi.org/project/canifinetune/0.4.1/)
 [![Docs](https://img.shields.io/badge/docs-online-0f766e)](https://daoyuanli2816.github.io/can-i-finetune-this/)
 [![Python](https://img.shields.io/badge/core-Python%203.10–3.14-2563eb)](https://daoyuanli2816.github.io/can-i-finetune-this/compatibility/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](https://github.com/DaoyuanLi2816/can-i-finetune-this/blob/v0.4.1/LICENSE)
