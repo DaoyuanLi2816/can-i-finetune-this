@@ -1,8 +1,8 @@
 # 0.4.0 implementation and qualification record
 
-Baseline: `053ce9e115b213e0ded3634e00d564ef97561f9b` (clean main). GitHub
-and the live PyPI JSON API both report 0.3.0; the previous release workflow
-succeeded. Main has no branch protection or repository rulesets; the maintainer
+Baseline: `053ce9e115b213e0ded3634e00d564ef97561f9b` (clean main). At the start,
+GitHub and the live PyPI JSON API both reported 0.3.0; its release workflow
+had succeeded. Main had no branch protection or repository rulesets; the maintainer
 has ADMIN permission. Work uses a branch and CI before integration.
 
 ## Confirmed findings
@@ -76,8 +76,18 @@ the qualified torch/bitsandbytes constraints.
 
 ## Delivery status
 
-Implementation, candidate qualification, release and public-install verification
-are in progress. No new version has been released yet.
+Completed: implementation, installed candidate qualification, annotated `v0.4.0`,
+[GitHub Release](https://github.com/DaoyuanLi2816/can-i-finetune-this/releases/tag/v0.4.0),
+[official PyPI 0.4.0](https://pypi.org/project/canifinetune/0.4.0/) and public-install
+verification. Release commit is `2edf707ac2040a2dc7a55dfe26dfa9f427b8fc45`.
+The [release workflow](https://github.com/DaoyuanLi2816/can-i-finetune-this/actions/runs/37165739098)
+passed all three jobs; public wheel/sdist hashes exactly match the tested files.
+Fresh official-index installs outside the checkout passed torch-free core and
+real CPU full/LoRA plus CUDA LoRA/QLoRA update/save/reload qualification. The pinned
+0.5B quickstart also passed two QLoRA updates and adapter reload/generation.
+See [release verification](release-verification-0.4.0.md) for commands, identities,
+receipts, compatibility, attribution and remaining unqualified scope. No external
+publication blocker remains. The shipped demo is local; no hosted service is claimed.
 
 GPU-pressure diagnosis retained disagreeing CUDA-driver/nvidia-smi readings;
 single-device budgets now use the lower reading. The interrupted extra repeat

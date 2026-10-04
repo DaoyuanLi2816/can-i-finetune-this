@@ -60,7 +60,7 @@ validation or a long-training guarantee. Synthetic labels do not measure quality
 
 ## Execution evidence and negative results
 
-Minimum and recommended stacks each passed 13 real offline CPU integration tests:
+Minimum and recommended stacks each passed 14 real offline CPU integration tests:
 full/LoRA updates, native BPE multi-turn masks, shared EOS/PAD, save/reload, output
 protection, malformed/truncated data and save failure. A separate real 0.5B QLoRA
 recipe exercised paged AdamW8bit with two updates. Exact installed candidate/public
@@ -75,7 +75,10 @@ not prove every modern TRL installation fails. An extra repeat was interrupted
 when device free memory fell to about 0.25 GiB. It has no successful observation
 or exact peak and does not enter these four denominators. No unrelated GPU
 process was stopped. Earlier local repeats remain local qualification evidence,
-not additional independent samples.
+not additional independent samples. Final release and fresh official PyPI
+qualification, including pinned 0.5B QLoRA save/reload, are documented separately
+in [release verification](release-verification-0.4.0.md); they are not extra
+observations in this four-point accuracy cohort.
 
 No WSL GPU, other GPU, Flash Attention, Liger, int8/fp4 accuracy, long-training
 stability or useful fine-tuned quality is qualified. Historical development raw
