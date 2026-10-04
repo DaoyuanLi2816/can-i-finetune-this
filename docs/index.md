@@ -4,12 +4,11 @@ hide:
 ---
 
 <div class="cft-hero">
-  <img class="cft-mark" src="assets/logo.png" alt="canifinetune GPU preflight logo">
   <div>
     <p class="cft-eyebrow">CANIFINETUNE / SINGLE GPU PREFLIGHT</p>
     <h1>Can I fine-tune this LLM on my GPU?</h1>
     <p class="cft-lead">Make a memory plan before loading weights. Then generate a recipe and check it with a real local run.</p>
-    <div class="cft-actions"><a class="md-button md-button--primary" href="quickstart/">Get your first result</a><a class="md-button" href="zh-CN/">中文入门</a></div>
+    <div class="cft-actions"><a class="md-button md-button--primary" href="quickstart/">Get your first result</a><a class="md-button" href="how-it-works/">How it works</a></div>
   </div>
 </div>
 

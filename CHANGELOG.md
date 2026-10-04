@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Remove the custom project logo and Chinese README/quickstart; keep the README
+  and documentation in English with the banner, demo and architecture visuals.
+- Simplify the documentation home layout and restore the English search pipeline.
+
 ## 0.4.1
 
 - Restore the README banner, architecture visual and first-use story with a new

@@ -9,8 +9,6 @@ theme:
   name: material
   language: en
   font: false
-  logo: assets/logo.png
-  favicon: assets/logo.png
   icon:
     repo: fontawesome/brands/github
   palette:
@@ -38,11 +36,7 @@ theme:
     - search.suggest
 plugins:
   - search:
-      # Chinese is segmented by jieba at build time. Keep those tokens intact
-      # instead of loading the Node-only Chinese tokenizer in the browser.
       lang: en
-      separator: '[\s\u200b\-,:!=\[\]()"/，。！？；：、]+'
-      pipeline: []
 markdown_extensions:
   - admonition
   - attr_list
@@ -72,9 +66,6 @@ nav:
       - Read and contribute evidence: evidence.md
       - Prospective validation: validation-0.4.0.md
       - Historical baselines: rtx4080_baselines.md
-  - 中文入门:
-      - 项目介绍: zh-CN/index.md
-      - 安装与第一次运行: zh-CN/quickstart.md
   - Maintainer:
       - Release process: releasing.md
       - 0.4.1 release verification: release-verification-0.4.1.md

@@ -1,5 +1,8 @@
 # 0.4.1 presentation and public-release verification
 
+This record describes the immutable 0.4.1 artifacts. Current main's README and
+documentation use English entry points without the custom logo.
+
 The earlier README rewrite removed the display entries for the existing banner
 and architecture image. The source assets survived. Version 0.4.1 restores the
 original banner style and adds a new project logo, editable current SVG diagrams,
