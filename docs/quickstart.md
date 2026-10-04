@@ -9,7 +9,7 @@ qualification uses Python 3.12. Start in a new working directory, outside a clon
 py -3.12 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 $env:PYTHONUTF8 = "1"
-python -m pip install --index-url https://pypi.org/simple canifinetune==0.4.0
+python -m pip install --index-url https://pypi.org/simple canifinetune==0.4.1
 canifinetune estimate --model Qwen/Qwen2.5-1.5B-Instruct --method qlora --gpu-vram-gb 16 --seq-len 2048 --offline
 canifinetune demo
 ```
@@ -22,7 +22,7 @@ For the verified RTX 4080 CUDA path (compatible NVIDIA driver required):
 
 ```powershell
 python -m pip install torch==2.6.0 --index-url https://download.pytorch.org/whl/cu124
-python -m pip install -c https://raw.githubusercontent.com/DaoyuanLi2816/can-i-finetune-this/v0.4.0/constraints/train-recommended.txt "canifinetune[train]==0.4.0"
+python -m pip install -c https://raw.githubusercontent.com/DaoyuanLi2816/can-i-finetune-this/v0.4.1/constraints/train-recommended.txt "canifinetune[train]==0.4.1"
 canifinetune recipe --model Qwen/Qwen2.5-0.5B-Instruct --revision 7ae557604adf67be50417f59c2c2f167def9a775 --method qlora --seq-len 256 --max-steps 2 --grad-accum 1 --output my-recipe
 python my-recipe/train.py --config my-recipe/config.yaml
 python my-recipe/eval_smoke.py --output-dir my-recipe/output --max-new-tokens 8
@@ -41,10 +41,10 @@ not a quality evaluation. Check current free GPU memory before loading weights.
 python3.12 -m venv .venv
 source .venv/bin/activate
 export PYTHONUTF8=1
-python -m pip install canifinetune==0.4.0
+python -m pip install canifinetune==0.4.1
 canifinetune estimate --model Qwen/Qwen2.5-1.5B-Instruct --method qlora --gpu-vram-gb 16 --offline
 python -m pip install torch==2.6.0 --index-url https://download.pytorch.org/whl/cpu
-python -m pip install -c https://raw.githubusercontent.com/DaoyuanLi2816/can-i-finetune-this/v0.4.0/constraints/train-recommended.txt "canifinetune[train]==0.4.0"
+python -m pip install -c https://raw.githubusercontent.com/DaoyuanLi2816/can-i-finetune-this/v0.4.1/constraints/train-recommended.txt "canifinetune[train]==0.4.1"
 canifinetune smoke-model --output tiny-local
 canifinetune recipe --model tiny-local --method lora --device cpu --base-dtype fp32 --optimizer adamw_torch --seq-len 128 --max-steps 2 --grad-accum 1 --offline --output cpu-recipe
 python cpu-recipe/train.py --config cpu-recipe/config.yaml

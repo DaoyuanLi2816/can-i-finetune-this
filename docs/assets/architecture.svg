@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 660" role="img" aria-labelledby="title description">
+  <title id="title">canifinetune: one configuration, from plan to measured execution</title>
+  <desc id="description">Model metadata, total and free GPU memory, and training settings feed a shared configuration. Torch-free estimate and recommend produce a plan; installed recipes and benchmarks load weights, execute updates, save and reload. Records preserve effective configuration and measured peaks. Historical fitting, independent validation and community evidence stay separate.</desc>
+  <defs>
+    <linearGradient id="bg" x2="1" y2="1"><stop stop-color="#0f172a"/><stop offset="1" stop-color="#052e2b"/></linearGradient>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10" fill="#64748b"/></marker>
+  </defs>
+  <rect width="1120" height="660" rx="22" fill="url(#bg)"/>
+  <g font-family="Segoe UI, Helvetica, Arial, sans-serif">
+    <text x="36" y="48" fill="#f8fafc" font-size="27" font-weight="750">One configuration. From plan to measured execution.</text>
+    <text x="36" y="78" fill="#94a3b8" font-size="16">Plan with metadata first. Load weights when you choose to train or benchmark.</text>
+    <g fill="#fff">
+      <rect x="36" y="108" width="330" height="82" rx="12"/>
+      <rect x="395" y="108" width="330" height="82" rx="12"/>
+      <rect x="754" y="108" width="330" height="82" rx="12"/>
+    </g>
+    <g fill="#0f172a" font-size="18" font-weight="700">
+      <text x="56" y="140">HF model metadata</text><text x="415" y="140">GPU memory</text><text x="774" y="140">Training request</text>
+    </g>
+    <g fill="#475569" font-size="15">
+      <text x="56" y="168">architecture · parameters · revision</text><text x="415" y="168">actual total + currently free · GiB</text><text x="774" y="168">method · dtype · sequence · optimizer</text>
+    </g>
+    <path d="M201 190V220H919V190M560 190V238" fill="none" stroke="#64748b" stroke-width="2.5" marker-end="url(#arrow)"/>
+    <rect x="36" y="244" width="1048" height="74" rx="12" fill="#0f766e"/>
+    <text x="56" y="274" fill="#fff" font-size="19" font-weight="700">Shared validated configuration</text>
+    <text x="56" y="300" fill="#ccfbf1" font-size="15">dtype · attention · targets · quantization · optimizer · checkpointing · supervision</text>
+    <path d="M290 318V345M830 318V345" fill="none" stroke="#64748b" stroke-width="2.5" marker-end="url(#arrow)"/>
+    <rect x="36" y="350" width="508" height="134" rx="14" fill="#fff"/>
+    <rect x="576" y="350" width="508" height="134" rx="14" fill="#fff"/>
+    <rect x="36" y="350" width="508" height="6" rx="3" fill="#38bdf8"/>
+    <rect x="576" y="350" width="508" height="6" rx="3" fill="#34d399"/>
+    <text x="56" y="385" fill="#0369a1" font-size="13" font-weight="750" letter-spacing="1">PLAN · NO TORCH / NO WEIGHTS</text>
+    <text x="56" y="416" fill="#0f172a" font-size="21" font-weight="700">Estimate → recommend → recipe</text>
+    <text x="56" y="445" fill="#475569" font-size="15">Component budget · assumptions · suggested settings</text>
+    <text x="56" y="469" fill="#475569" font-size="15">Same estimator in the CLI and local demo</text>
+    <text x="596" y="385" fill="#047857" font-size="13" font-weight="750" letter-spacing="1">EXECUTE · LOADS MODEL WEIGHTS</text>
+    <text x="596" y="416" fill="#0f172a" font-size="21" font-weight="700">Installed recipe or benchmark</text>
+    <text x="596" y="445" fill="#475569" font-size="15">Transformers / PEFT · native data and loss semantics</text>
+    <text x="596" y="469" fill="#475569" font-size="15">Real updates · staged model/adapter save · reload</text>
+    <path d="M290 484V510H830V484M560 510V528" fill="none" stroke="#64748b" stroke-width="2.5" marker-end="url(#arrow)"/>
+    <rect x="36" y="534" width="1048" height="72" rx="12" fill="#172c3b" stroke="#334d60"/>
+    <text x="56" y="564" fill="#e2e8f0" font-size="18" font-weight="700">Reviewable records → reports / comparison / opt-in redacted export</text>
+    <text x="56" y="589" fill="#a5c3d0" font-size="15">requested + effective settings · source/version · status · allocated/reserved peaks · measurement scope</text>
+    <text x="36" y="640" fill="#94a3b8" font-size="15">Historical fits, independent validation and unreviewed community evidence remain separate.</text>
+  </g>
+</svg>

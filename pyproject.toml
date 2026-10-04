@@ -75,6 +75,7 @@ canifinetune = "canifinetune.cli:app"
 
 [project.urls]
 Homepage = "https://github.com/DaoyuanLi2816/can-i-finetune-this"
+Documentation = "https://daoyuanli2816.github.io/can-i-finetune-this/"
 Issues = "https://github.com/DaoyuanLi2816/can-i-finetune-this/issues"
 Repository = "https://github.com/DaoyuanLi2816/can-i-finetune-this"
 
@@ -88,6 +89,7 @@ path = "src/canifinetune/__init__.py"
 include = [
   "src/canifinetune",
   "README.md",
+  "README.zh-CN.md",
   "CHANGELOG.md",
   "LICENSE",
   "pyproject.toml",
