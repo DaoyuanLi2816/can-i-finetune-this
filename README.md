@@ -1,15 +1,11 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/DaoyuanLi2816/can-i-finetune-this/v0.4.1/docs/assets/logo.png" alt="canifinetune GPU preflight logo" width="104">
-</p>
-<p align="center">
   <img src="https://raw.githubusercontent.com/DaoyuanLi2816/can-i-finetune-this/v0.4.1/docs/banner.svg" alt="canifinetune — Can I fine-tune this LLM on my GPU? Estimate a memory budget, measure local training, and generate a runnable recipe." width="880">
 </p>
 
 <p align="center">
   <a href="https://daoyuanli2816.github.io/can-i-finetune-this/">Documentation</a> ·
   <a href="https://daoyuanli2816.github.io/can-i-finetune-this/quickstart/">Quickstart</a> ·
-  <a href="https://pypi.org/project/canifinetune/">PyPI</a> ·
-  <a href="https://github.com/DaoyuanLi2816/can-i-finetune-this/blob/v0.4.1/README.zh-CN.md">中文</a>
+  <a href="https://pypi.org/project/canifinetune/">PyPI</a>
 </p>
 
 [![CI](https://github.com/DaoyuanLi2816/can-i-finetune-this/actions/workflows/ci.yml/badge.svg)](https://github.com/DaoyuanLi2816/can-i-finetune-this/actions/workflows/ci.yml)
@@ -134,8 +130,8 @@ pytest -q -m "not training" --cov=canifinetune --cov-fail-under=70
 python scripts/check_generated.py
 ```
 
-[Contributing](https://github.com/DaoyuanLi2816/can-i-finetune-this/blob/v0.4.1/CONTRIBUTING.md) ·
-[Changelog](https://github.com/DaoyuanLi2816/can-i-finetune-this/blob/v0.4.1/CHANGELOG.md) ·
+[Contributing](https://github.com/DaoyuanLi2816/can-i-finetune-this/blob/main/CONTRIBUTING.md) ·
+[Changelog](https://github.com/DaoyuanLi2816/can-i-finetune-this/blob/main/CHANGELOG.md) ·
 [Release process](https://daoyuanli2816.github.io/can-i-finetune-this/releasing/) ·
 [License](https://github.com/DaoyuanLi2816/can-i-finetune-this/blob/v0.4.1/LICENSE)
 

@@ -89,7 +89,6 @@ path = "src/canifinetune/__init__.py"
 include = [
   "src/canifinetune",
   "README.md",
-  "README.zh-CN.md",
   "CHANGELOG.md",
   "LICENSE",
   "pyproject.toml",

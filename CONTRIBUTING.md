@@ -30,10 +30,10 @@ python scripts/verify_docs.py --site site
 mkdocs serve
 ```
 
-Keep the English/Chinese entry points, README banner and architecture diagrams
+Keep the English entry points, README banner and architecture diagrams
 aligned with actual behavior. Edit the SVG sources in `docs/assets`; retain
 the original visuals and historical measurement records. Check desktop/mobile
-layout and both search languages. PRs build the site without publishing; main
+layout and English search. PRs build the site without publishing; main
 deploys it to GitHub Pages. Documentation dependencies are separate from core.
 
 ## Share a measurement manually
